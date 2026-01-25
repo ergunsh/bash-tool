@@ -126,12 +126,30 @@ const { tools } = await createBashTool({
 5. **Validation**: Input is validated against the Zod schema
 6. **JSON Output**: Results are returned as formatted JSON
 
-## Baseline Comparison
+## More Examples
 
-A baseline script using regular AI SDK tools is included for comparison:
+### Many Tools
+
+The `many-tools/` subdirectory demonstrates where shell tools reduce context usage - when you have many related operations (15 CRM tools):
+
+```bash
+npx tsx examples/shell-tools/many-tools/index.ts      # Shell tools
+npx tsx examples/shell-tools/many-tools/baseline.ts   # Baseline
+```
+
+### Piping
+
+The `piping/` subdirectory demonstrates where piping reduces LLM round-trips - complex queries that filter, join, and aggregate data in a single command:
+
+```bash
+npx tsx examples/shell-tools/piping/index.ts      # Shell tools + jq
+npx tsx examples/shell-tools/piping/baseline.ts   # Baseline
+```
+
+### Simple Baseline
+
+A baseline with 3 tools for the simple use case:
 
 ```bash
 npx tsx examples/shell-tools/baseline.ts
 ```
-
-Both scripts use the same prompt and mock database. Compare the `Total tokens` output to see context usage differences between shell tools (single bash tool) vs regular AI SDK tools (multiple tool definitions).
