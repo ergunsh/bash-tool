@@ -9,495 +9,179 @@
  */
 
 import { ToolLoopAgent } from "ai";
-import { z } from "zod";
 import {
   createBashTool,
   experimental_createShellTool as createShellTool,
 } from "../../../src/index.js";
-
-// Mock CRM database
-const db = {
-  customers: new Map([
-    [
-      "cust_1",
-      { name: "Acme Corp", email: "contact@acme.com", tier: "enterprise" },
-    ],
-    [
-      "cust_2",
-      { name: "Startup Inc", email: "hello@startup.io", tier: "growth" },
-    ],
-    [
-      "cust_3",
-      { name: "Local Shop", email: "owner@localshop.com", tier: "starter" },
-    ],
-  ]),
-  contacts: new Map([
-    [
-      "cont_1",
-      {
-        customerId: "cust_1",
-        name: "John Doe",
-        role: "CTO",
-        email: "john@acme.com",
-      },
-    ],
-    [
-      "cont_2",
-      {
-        customerId: "cust_1",
-        name: "Jane Smith",
-        role: "CEO",
-        email: "jane@acme.com",
-      },
-    ],
-    [
-      "cont_3",
-      {
-        customerId: "cust_2",
-        name: "Bob Wilson",
-        role: "Founder",
-        email: "bob@startup.io",
-      },
-    ],
-  ]),
-  deals: new Map([
-    [
-      "deal_1",
-      {
-        customerId: "cust_1",
-        value: 50000,
-        stage: "negotiation",
-        product: "Enterprise Plan",
-      },
-    ],
-    [
-      "deal_2",
-      {
-        customerId: "cust_2",
-        value: 5000,
-        stage: "proposal",
-        product: "Growth Plan",
-      },
-    ],
-    [
-      "deal_3",
-      {
-        customerId: "cust_1",
-        value: 25000,
-        stage: "closed_won",
-        product: "Add-on Package",
-      },
-    ],
-  ]),
-  tasks: new Map([
-    [
-      "task_1",
-      {
-        customerId: "cust_1",
-        title: "Follow up on proposal",
-        dueDate: "2024-02-01",
-        status: "pending",
-      },
-    ],
-    [
-      "task_2",
-      {
-        customerId: "cust_2",
-        title: "Schedule demo",
-        dueDate: "2024-01-25",
-        status: "completed",
-      },
-    ],
-  ]),
-  notes: new Map([
-    [
-      "note_1",
-      {
-        customerId: "cust_1",
-        content: "Very interested in enterprise features",
-        createdAt: "2024-01-15",
-      },
-    ],
-    [
-      "note_2",
-      {
-        customerId: "cust_2",
-        content: "Budget approved for Q1",
-        createdAt: "2024-01-20",
-      },
-    ],
-  ]),
-  activities: new Map([
-    [
-      "act_1",
-      {
-        customerId: "cust_1",
-        type: "call",
-        description: "Intro call",
-        date: "2024-01-10",
-      },
-    ],
-    [
-      "act_2",
-      {
-        customerId: "cust_1",
-        type: "email",
-        description: "Sent proposal",
-        date: "2024-01-12",
-      },
-    ],
-    [
-      "act_3",
-      {
-        customerId: "cust_2",
-        type: "meeting",
-        description: "Product demo",
-        date: "2024-01-18",
-      },
-    ],
-  ]),
-  invoices: new Map([
-    [
-      "inv_1",
-      {
-        customerId: "cust_1",
-        amount: 25000,
-        status: "paid",
-        dueDate: "2024-01-01",
-      },
-    ],
-    [
-      "inv_2",
-      {
-        customerId: "cust_3",
-        amount: 500,
-        status: "pending",
-        dueDate: "2024-02-01",
-      },
-    ],
-  ]),
-  products: new Map([
-    [
-      "prod_1",
-      {
-        name: "Starter Plan",
-        price: 99,
-        features: ["Basic support", "5 users"],
-      },
-    ],
-    [
-      "prod_2",
-      {
-        name: "Growth Plan",
-        price: 499,
-        features: ["Priority support", "25 users", "API access"],
-      },
-    ],
-    [
-      "prod_3",
-      {
-        name: "Enterprise Plan",
-        price: 2999,
-        features: ["24/7 support", "Unlimited users", "Custom integrations"],
-      },
-    ],
-  ]),
-};
+import {
+  descriptions,
+  executeGetContact,
+  executeGetCustomer,
+  executeGetDeal,
+  executeGetInvoice,
+  executeGetProduct,
+  executeGetTask,
+  executeListActivities,
+  executeListContacts,
+  executeListCustomers,
+  executeListDeals,
+  executeListInvoices,
+  executeListNotes,
+  executeListProducts,
+  executeListTasks,
+  executeSearchCustomers,
+  getContactInputSchema,
+  getContactOutputSchema,
+  getCustomerInputSchema,
+  getCustomerOutputSchema,
+  getDealInputSchema,
+  getDealOutputSchema,
+  getInvoiceInputSchema,
+  getInvoiceOutputSchema,
+  getProductInputSchema,
+  getProductOutputSchema,
+  getTaskInputSchema,
+  getTaskOutputSchema,
+  listActivitiesInputSchema,
+  listActivitiesOutputSchema,
+  listContactsInputSchema,
+  listContactsOutputSchema,
+  listCustomersInputSchema,
+  listCustomersOutputSchema,
+  listDealsInputSchema,
+  listDealsOutputSchema,
+  listInvoicesInputSchema,
+  listInvoicesOutputSchema,
+  listNotesInputSchema,
+  listNotesOutputSchema,
+  listProductsInputSchema,
+  listProductsOutputSchema,
+  listTasksInputSchema,
+  listTasksOutputSchema,
+  prompt,
+  searchCustomersInputSchema,
+  searchCustomersOutputSchema,
+} from "./shared.js";
 
 // ============ Customer Tools ============
 
 const getCustomer = createShellTool({
-  description: "Get customer details by ID",
-  inputSchema: z.object({ id: z.string() }),
-  outputSchema: z.object({
-    id: z.string(),
-    name: z.string(),
-    email: z.string(),
-    tier: z.string(),
-  }),
-  execute: async ({ id }) => {
-    const customer = db.customers.get(id);
-    if (!customer) throw new Error(`Customer not found: ${id}`);
-    return { id, ...customer };
-  },
+  description: descriptions.getCustomer,
+  inputSchema: getCustomerInputSchema,
+  outputSchema: getCustomerOutputSchema,
+  execute: executeGetCustomer,
 });
 
 const listCustomers = createShellTool({
-  description: "List all customers",
-  inputSchema: z.object({ tier: z.string().optional() }),
-  outputSchema: z.object({
-    customers: z.array(
-      z.object({ id: z.string(), name: z.string(), tier: z.string() }),
-    ),
-  }),
-  execute: async ({ tier }) => {
-    const customers = Array.from(db.customers.entries())
-      .filter(([_, c]) => !tier || c.tier === tier)
-      .map(([id, c]) => ({ id, name: c.name, tier: c.tier }));
-    return { customers };
-  },
+  description: descriptions.listCustomers,
+  inputSchema: listCustomersInputSchema,
+  outputSchema: listCustomersOutputSchema,
+  execute: executeListCustomers,
 });
 
 const searchCustomers = createShellTool({
-  description: "Search customers by name",
-  inputSchema: z.object({ query: z.string() }),
-  outputSchema: z.object({
-    results: z.array(z.object({ id: z.string(), name: z.string() })),
-  }),
-  execute: async ({ query }) => {
-    const results = Array.from(db.customers.entries())
-      .filter(([_, c]) => c.name.toLowerCase().includes(query.toLowerCase()))
-      .map(([id, c]) => ({ id, name: c.name }));
-    return { results };
-  },
+  description: descriptions.searchCustomers,
+  inputSchema: searchCustomersInputSchema,
+  outputSchema: searchCustomersOutputSchema,
+  execute: executeSearchCustomers,
 });
 
 // ============ Contact Tools ============
 
 const getContact = createShellTool({
-  description: "Get contact details",
-  inputSchema: z.object({ id: z.string() }),
-  outputSchema: z.object({
-    id: z.string(),
-    name: z.string(),
-    role: z.string(),
-    email: z.string(),
-    customerId: z.string(),
-  }),
-  execute: async ({ id }) => {
-    const contact = db.contacts.get(id);
-    if (!contact) throw new Error(`Contact not found: ${id}`);
-    return { id, ...contact };
-  },
+  description: descriptions.getContact,
+  inputSchema: getContactInputSchema,
+  outputSchema: getContactOutputSchema,
+  execute: executeGetContact,
 });
 
 const listContacts = createShellTool({
-  description: "List contacts for a customer",
-  inputSchema: z.object({ customerId: z.string() }),
-  outputSchema: z.object({
-    contacts: z.array(
-      z.object({ id: z.string(), name: z.string(), role: z.string() }),
-    ),
-  }),
-  execute: async ({ customerId }) => {
-    const contacts = Array.from(db.contacts.entries())
-      .filter(([_, c]) => c.customerId === customerId)
-      .map(([id, c]) => ({ id, name: c.name, role: c.role }));
-    return { contacts };
-  },
+  description: descriptions.listContacts,
+  inputSchema: listContactsInputSchema,
+  outputSchema: listContactsOutputSchema,
+  execute: executeListContacts,
 });
 
 // ============ Deal Tools ============
 
 const getDeal = createShellTool({
-  description: "Get deal details",
-  inputSchema: z.object({ id: z.string() }),
-  outputSchema: z.object({
-    id: z.string(),
-    customerId: z.string(),
-    value: z.number(),
-    stage: z.string(),
-    product: z.string(),
-  }),
-  execute: async ({ id }) => {
-    const deal = db.deals.get(id);
-    if (!deal) throw new Error(`Deal not found: ${id}`);
-    return { id, ...deal };
-  },
+  description: descriptions.getDeal,
+  inputSchema: getDealInputSchema,
+  outputSchema: getDealOutputSchema,
+  execute: executeGetDeal,
 });
 
 const listDeals = createShellTool({
-  description: "List deals, optionally filtered by customer or stage",
-  inputSchema: z.object({
-    customerId: z.string().optional(),
-    stage: z.string().optional(),
-  }),
-  outputSchema: z.object({
-    deals: z.array(
-      z.object({ id: z.string(), value: z.number(), stage: z.string() }),
-    ),
-    totalValue: z.number(),
-  }),
-  execute: async ({ customerId, stage }) => {
-    const deals = Array.from(db.deals.entries())
-      .filter(
-        ([_, d]) =>
-          (!customerId || d.customerId === customerId) &&
-          (!stage || d.stage === stage),
-      )
-      .map(([id, d]) => ({ id, value: d.value, stage: d.stage }));
-    return { deals, totalValue: deals.reduce((sum, d) => sum + d.value, 0) };
-  },
+  description: descriptions.listDeals,
+  inputSchema: listDealsInputSchema,
+  outputSchema: listDealsOutputSchema,
+  execute: executeListDeals,
 });
 
 // ============ Task Tools ============
 
 const getTask = createShellTool({
-  description: "Get task details",
-  inputSchema: z.object({ id: z.string() }),
-  outputSchema: z.object({
-    id: z.string(),
-    customerId: z.string(),
-    title: z.string(),
-    dueDate: z.string(),
-    status: z.string(),
-  }),
-  execute: async ({ id }) => {
-    const task = db.tasks.get(id);
-    if (!task) throw new Error(`Task not found: ${id}`);
-    return { id, ...task };
-  },
+  description: descriptions.getTask,
+  inputSchema: getTaskInputSchema,
+  outputSchema: getTaskOutputSchema,
+  execute: executeGetTask,
 });
 
 const listTasks = createShellTool({
-  description: "List tasks for a customer",
-  inputSchema: z.object({
-    customerId: z.string(),
-    status: z.string().optional(),
-  }),
-  outputSchema: z.object({
-    tasks: z.array(
-      z.object({ id: z.string(), title: z.string(), status: z.string() }),
-    ),
-  }),
-  execute: async ({ customerId, status }) => {
-    const tasks = Array.from(db.tasks.entries())
-      .filter(
-        ([_, t]) =>
-          t.customerId === customerId && (!status || t.status === status),
-      )
-      .map(([id, t]) => ({ id, title: t.title, status: t.status }));
-    return { tasks };
-  },
+  description: descriptions.listTasks,
+  inputSchema: listTasksInputSchema,
+  outputSchema: listTasksOutputSchema,
+  execute: executeListTasks,
 });
 
 // ============ Note Tools ============
 
 const listNotes = createShellTool({
-  description: "List notes for a customer",
-  inputSchema: z.object({ customerId: z.string() }),
-  outputSchema: z.object({
-    notes: z.array(
-      z.object({ id: z.string(), content: z.string(), createdAt: z.string() }),
-    ),
-  }),
-  execute: async ({ customerId }) => {
-    const notes = Array.from(db.notes.entries())
-      .filter(([_, n]) => n.customerId === customerId)
-      .map(([id, n]) => ({ id, content: n.content, createdAt: n.createdAt }));
-    return { notes };
-  },
+  description: descriptions.listNotes,
+  inputSchema: listNotesInputSchema,
+  outputSchema: listNotesOutputSchema,
+  execute: executeListNotes,
 });
 
 // ============ Activity Tools ============
 
 const listActivities = createShellTool({
-  description: "List activities for a customer",
-  inputSchema: z.object({
-    customerId: z.string(),
-    type: z.string().optional(),
-  }),
-  outputSchema: z.object({
-    activities: z.array(
-      z.object({
-        id: z.string(),
-        type: z.string(),
-        description: z.string(),
-        date: z.string(),
-      }),
-    ),
-  }),
-  execute: async ({ customerId, type }) => {
-    const activities = Array.from(db.activities.entries())
-      .filter(
-        ([_, a]) => a.customerId === customerId && (!type || a.type === type),
-      )
-      .map(([id, a]) => ({
-        id,
-        type: a.type,
-        description: a.description,
-        date: a.date,
-      }));
-    return { activities };
-  },
+  description: descriptions.listActivities,
+  inputSchema: listActivitiesInputSchema,
+  outputSchema: listActivitiesOutputSchema,
+  execute: executeListActivities,
 });
 
 // ============ Invoice Tools ============
 
 const getInvoice = createShellTool({
-  description: "Get invoice details",
-  inputSchema: z.object({ id: z.string() }),
-  outputSchema: z.object({
-    id: z.string(),
-    customerId: z.string(),
-    amount: z.number(),
-    status: z.string(),
-    dueDate: z.string(),
-  }),
-  execute: async ({ id }) => {
-    const invoice = db.invoices.get(id);
-    if (!invoice) throw new Error(`Invoice not found: ${id}`);
-    return { id, ...invoice };
-  },
+  description: descriptions.getInvoice,
+  inputSchema: getInvoiceInputSchema,
+  outputSchema: getInvoiceOutputSchema,
+  execute: executeGetInvoice,
 });
 
 const listInvoices = createShellTool({
-  description: "List invoices for a customer",
-  inputSchema: z.object({
-    customerId: z.string(),
-    status: z.string().optional(),
-  }),
-  outputSchema: z.object({
-    invoices: z.array(
-      z.object({ id: z.string(), amount: z.number(), status: z.string() }),
-    ),
-    total: z.number(),
-  }),
-  execute: async ({ customerId, status }) => {
-    const invoices = Array.from(db.invoices.entries())
-      .filter(
-        ([_, i]) =>
-          i.customerId === customerId && (!status || i.status === status),
-      )
-      .map(([id, i]) => ({ id, amount: i.amount, status: i.status }));
-    return { invoices, total: invoices.reduce((sum, i) => sum + i.amount, 0) };
-  },
+  description: descriptions.listInvoices,
+  inputSchema: listInvoicesInputSchema,
+  outputSchema: listInvoicesOutputSchema,
+  execute: executeListInvoices,
 });
 
 // ============ Product Tools ============
 
 const getProduct = createShellTool({
-  description: "Get product details",
-  inputSchema: z.object({ id: z.string() }),
-  outputSchema: z.object({
-    id: z.string(),
-    name: z.string(),
-    price: z.number(),
-    features: z.array(z.string()),
-  }),
-  execute: async ({ id }) => {
-    const product = db.products.get(id);
-    if (!product) throw new Error(`Product not found: ${id}`);
-    return { id, ...product };
-  },
+  description: descriptions.getProduct,
+  inputSchema: getProductInputSchema,
+  outputSchema: getProductOutputSchema,
+  execute: executeGetProduct,
 });
 
 const listProducts = createShellTool({
-  description: "List all products",
-  inputSchema: z.object({}),
-  outputSchema: z.object({
-    products: z.array(
-      z.object({ id: z.string(), name: z.string(), price: z.number() }),
-    ),
-  }),
-  execute: async () => {
-    const products = Array.from(db.products.entries()).map(([id, p]) => ({
-      id,
-      name: p.name,
-      price: p.price,
-    }));
-    return { products };
-  },
+  description: descriptions.listProducts,
+  inputSchema: listProductsInputSchema,
+  outputSchema: listProductsOutputSchema,
+  execute: executeListProducts,
 });
 
 async function main() {
@@ -560,10 +244,7 @@ async function main() {
     },
   });
 
-  const prompt =
-    "Give me a summary of Acme Corp - their contacts, open deals, and recent activities.";
-
-  console.log("Sending prompt to agent...\n");
+  console.log(`Prompt: "${prompt}"\n`);
   console.log("---");
 
   const result = await agent.generate({ prompt });

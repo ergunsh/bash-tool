@@ -130,26 +130,19 @@ const { tools } = await createBashTool({
 
 ### Many Tools
 
-The `many-tools/` subdirectory demonstrates where shell tools reduce context usage - when you have many related operations (15 CRM tools):
+The `many-tools/` subdirectory shows shell tools with many related operations (15 CRM tools). Includes a baseline for testing:
 
 ```bash
 npx tsx examples/shell-tools/many-tools/index.ts      # Shell tools
-npx tsx examples/shell-tools/many-tools/baseline.ts   # Baseline
+npx tsx examples/shell-tools/many-tools/baseline.ts   # Baseline (for testing)
 ```
 
 ### Piping
 
-The `piping/` subdirectory demonstrates where piping reduces LLM round-trips - complex queries that filter, join, and aggregate data in a single command:
+The `piping/` subdirectory shows shell tools with jq piping for complex queries. Includes a baseline for testing:
 
 ```bash
 npx tsx examples/shell-tools/piping/index.ts      # Shell tools + jq
-npx tsx examples/shell-tools/piping/baseline.ts   # Baseline
+npx tsx examples/shell-tools/piping/baseline.ts   # Baseline (for testing)
 ```
 
-### Simple Baseline
-
-A baseline with 3 tools for the simple use case:
-
-```bash
-npx tsx examples/shell-tools/baseline.ts
-```

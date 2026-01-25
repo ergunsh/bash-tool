@@ -52,3 +52,12 @@ Compare:
 ## Key Insight
 
 Shell tools return rich, denormalized data that's optimized for piping. The `list-orders` tool embeds customer and product details in each order, enabling powerful one-liner queries with `jq`.
+
+## Shared Tool Definitions
+
+Both examples use `shared.ts` which defines:
+- Schemas (input/output)
+- Execute functions
+- Descriptions
+
+This ensures identical behavior between shell tools and AI SDK tools, making the comparison fair. The only difference is how tools are exposed to the agent.
