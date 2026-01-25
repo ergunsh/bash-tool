@@ -151,26 +151,20 @@ async function main() {
     },
   });
 
-  console.log("Shell tools registered:");
-  console.log("  - fetch-user: Fetches a user from the mock database");
-  console.log("  - list-users: Lists all users in the database");
-  console.log("  - send-email: Sends an email to a recipient");
-  console.log("");
+  console.log(
+    "Shell tools registered. Agent will discover them via bash tool description.\n",
+  );
 
   // Create the agent with the bash tool
+  // Note: The bash tool description already includes shell tools documentation,
+  // so the agent can discover them without explicit instructions
   const agent = new ToolLoopAgent({
     model: "anthropic/claude-haiku-4.5",
     tools: {
       bash: tools.bash,
     },
-    instructions: `You are a helpful assistant with access to custom shell tools.
-Use bash to run commands. Custom tools are available:
-- fetch-user --id <id> [--include-metadata]: Get user info
-- list-users [--limit <n>]: List all users
-- send-email --to <email> --subject <subject> [--body <text>]: Send email
-
-You can pipe output to jq for filtering: list-users | jq '.users[0].name'
-Run any tool with --help for detailed documentation.`,
+    instructions:
+      "You are a helpful assistant. Use the bash tool to help users with their requests.",
     onStepFinish: ({ toolCalls, toolResults }) => {
       if (toolCalls && toolCalls.length > 0) {
         for (const call of toolCalls) {
@@ -201,14 +195,9 @@ Run any tool with --help for detailed documentation.`,
     },
   });
 
-  // Example prompt
-  const prompt = `
-    I need to:
-    1. First, list all available users
-    2. Then fetch details for user usr_1 with metadata
-    3. Extract just the email using jq
-    4. Finally, send a welcome email to that address with subject "Welcome!"
-  `;
+  // Example prompt - a natural user request
+  const prompt =
+    "Can you send a welcome email to usr_1? Use their actual email address from the database.";
 
   console.log("Sending prompt to agent...\n");
   console.log("---");

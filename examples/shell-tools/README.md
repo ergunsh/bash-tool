@@ -12,7 +12,6 @@ This example demonstrates how to create custom shell tools that run as CLI comma
 ## Running the Example
 
 ```bash
-# From the repository root
 npx tsx examples/shell-tools/index.ts
 ```
 
@@ -126,3 +125,13 @@ const { tools } = await createBashTool({
 4. **Execution**: The AI agent can call tools via bash commands
 5. **Validation**: Input is validated against the Zod schema
 6. **JSON Output**: Results are returned as formatted JSON
+
+## Baseline Comparison
+
+A baseline script using regular AI SDK tools is included for comparison:
+
+```bash
+npx tsx examples/shell-tools/baseline.ts
+```
+
+Both scripts use the same prompt and mock database. Compare the `Total tokens` output to see context usage differences between shell tools (single bash tool) vs regular AI SDK tools (multiple tool definitions).
