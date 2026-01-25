@@ -1,3 +1,4 @@
+import type { Command } from "just-bash";
 import type { CommandResult, Sandbox } from "../types.js";
 
 /**
@@ -30,6 +31,11 @@ export interface JustBashSandboxOptions {
    * When provided, `files` is ignored.
    */
   overlayRoot?: string;
+  /**
+   * Custom commands to register in the bash environment.
+   * Used for shell tools that are available as CLI commands.
+   */
+  customCommands?: Command[];
 }
 
 /**
@@ -66,12 +72,14 @@ export async function createJustBashSandbox(
     bashEnv = new Bash({
       fs: overlay,
       cwd: options.cwd ?? mountPoint,
+      customCommands: options.customCommands,
     });
   } else {
     // Use in-memory filesystem with provided files
     bashEnv = new Bash({
       files: options.files,
       cwd: options.cwd,
+      customCommands: options.customCommands,
     });
   }
 

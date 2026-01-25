@@ -1,4 +1,9 @@
 export type { JustBashLike } from "./sandbox/just-bash.js";
+export { experimental_createShellTool } from "./shell-tools/index.js";
+export type {
+  ShellToolContext,
+  ShellToolDefinition,
+} from "./shell-tools/types.js";
 export { experimental_createSkillTool } from "./skill-tool.js";
 export type {
   CreateSkillToolOptions,

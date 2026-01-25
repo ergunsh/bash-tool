@@ -6,6 +6,7 @@ import {
   wrapJustBash,
 } from "./sandbox/just-bash.js";
 import { isVercelSandbox, wrapVercelSandbox } from "./sandbox/vercel.js";
+import { generateShellToolsPrompt, toCommands } from "./shell-tools/index.js";
 import { createBashExecuteTool } from "./tools/bash.js";
 import { createReadFileTool } from "./tools/read-file.js";
 import { createWriteFileTool } from "./tools/write-file.js";
@@ -53,6 +54,11 @@ export async function createBashTool(
       : DEFAULT_DESTINATION;
   const destination = options.destination ?? defaultDestination;
 
+  // Convert shell tools to just-bash commands
+  const customCommands = options.shellTools
+    ? toCommands(options.shellTools)
+    : undefined;
+
   // 3. Create or wrap sandbox
   let sandbox: Sandbox;
   let usingJustBash = false;
@@ -64,6 +70,21 @@ export async function createBashTool(
   let fileWrittenPromise: Promise<void> | undefined;
 
   if (options.sandbox) {
+    // Shell tools require just-bash - check if external sandbox is compatible
+    if (options.shellTools) {
+      if (isVercelSandbox(options.sandbox)) {
+        throw new Error(
+          "Shell tools are only supported with just-bash sandbox. " +
+            "When using @vercel/sandbox, remove the shellTools option or use just-bash instead.",
+        );
+      }
+      if (!isJustBash(options.sandbox)) {
+        throw new Error(
+          "Shell tools are only supported with just-bash sandbox. " +
+            "Provide a just-bash Bash instance or remove the shellTools option.",
+        );
+      }
+    }
     // External sandbox provided - stream files and write in batches
     // Check @vercel/sandbox first (more specific check)
     if (isVercelSandbox(options.sandbox)) {
@@ -123,6 +144,7 @@ export async function createBashTool(
       const overlayRoot = path.resolve(options.uploadDirectory.source);
       const result = await createJustBashSandbox({
         overlayRoot,
+        customCommands,
       });
       sandbox = result;
 
@@ -173,6 +195,7 @@ export async function createBashTool(
       sandbox = await createJustBashSandbox({
         files: filesWithDestination,
         cwd: destination,
+        customCommands,
       });
     }
   }
@@ -188,12 +211,22 @@ export async function createBashTool(
     fileWrittenPromise,
   ]);
 
-  // 5. Create tools
+  // 5. Generate shell tools prompt if shell tools are provided
+  const shellToolsPrompt = options.shellTools
+    ? generateShellToolsPrompt(options.shellTools)
+    : "";
+
+  // Combine tool prompts
+  const combinedPrompt = shellToolsPrompt
+    ? `${toolPrompt}\n\n${shellToolsPrompt}`
+    : toolPrompt;
+
+  // 6. Create tools
   const bash = createBashExecuteTool({
     sandbox,
     cwd: workingDir,
     files: fileList,
-    toolPrompt,
+    toolPrompt: combinedPrompt,
     extraInstructions: options.extraInstructions,
     onBeforeBashCall: options.onBeforeBashCall,
     onAfterBashCall: options.onAfterBashCall,
