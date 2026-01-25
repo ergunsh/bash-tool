@@ -146,3 +146,35 @@ npx tsx examples/shell-tools/piping/index.ts      # Shell tools + jq
 npx tsx examples/shell-tools/piping/baseline.ts   # Baseline (for testing)
 ```
 
+### Composing
+
+The `composing/` subdirectory tests whether bash scripting can save LLM round-trips by executing multiple tool calls in one script.
+
+```bash
+npx tsx examples/shell-tools/composing/index.ts      # Shell tools version
+npx tsx examples/shell-tools/composing/baseline.ts   # Baseline (for comparison)
+npx tsx examples/shell-tools/composing/compare.ts    # Run both and compare
+```
+
+**Scenario: User + Team Join**
+
+The prompt asks: "Get the full details for user 'alice', including their team's name and department."
+
+This requires:
+1. Get user → extract teamId
+2. Get team using that teamId
+3. Combine results
+
+**Expected behavior (not yet achieved):**
+
+Shell tools version COULD do this in one bash call:
+```bash
+user=$(get-user --id alice)
+team_id=$(echo "$user" | jq -r '.teamId')
+get-team --id "$team_id"
+```
+
+But currently the agent makes 2 separate calls, same as baseline.
+
+**Current status:** This example serves as a test case for improving the bash tool prompt. See `CONTEXT.md` for investigation notes and next steps.
+
