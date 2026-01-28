@@ -67,7 +67,7 @@ async function runShellToolsVersion(): Promise<RunResult> {
   });
 
   const agent = new ToolLoopAgent({
-    model: "anthropic/claude-haiku-4.5",
+    model: "anthropic/claude-sonnet-4.5",
     tools: { bash: tools.bash },
     instructions:
       "You are a helpful analytics assistant. Use the bash tool to query data.",
@@ -111,7 +111,7 @@ async function runBaselineVersion(): Promise<RunResult> {
   });
 
   const agent = new ToolLoopAgent({
-    model: "anthropic/claude-haiku-4.5",
+    model: "anthropic/claude-sonnet-4.5",
     tools: {
       listOrders,
       listCustomers,
