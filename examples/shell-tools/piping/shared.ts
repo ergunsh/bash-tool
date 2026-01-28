@@ -126,11 +126,12 @@ export const db = {
 
 // ============ Shared Schemas ============
 
+const statusEnum = z.enum(["completed", "pending", "refunded"]);
+const tierEnum = z.enum(["premium", "standard"]);
+const stateEnum = z.enum(["CA", "NY", "TX"]);
+
 export const listOrdersInputSchema = z.object({
-  status: z
-    .string()
-    .optional()
-    .describe("Filter by status: completed, pending, refunded"),
+  status: statusEnum.optional().describe("Filter by order status"),
 });
 
 export const listOrdersOutputSchema = z.object({
@@ -140,8 +141,8 @@ export const listOrdersOutputSchema = z.object({
       customer: z.object({
         id: z.string(),
         name: z.string(),
-        tier: z.string(),
-        state: z.string(),
+        tier: tierEnum,
+        state: stateEnum,
       }),
       product: z.object({
         id: z.string(),
@@ -150,15 +151,15 @@ export const listOrdersOutputSchema = z.object({
       }),
       quantity: z.number(),
       total: z.number(),
-      status: z.string(),
+      status: statusEnum,
       date: z.string(),
     }),
   ),
 });
 
 export const listCustomersInputSchema = z.object({
-  tier: z.string().optional().describe("Filter by tier: premium, standard"),
-  state: z.string().optional().describe("Filter by state code"),
+  tier: tierEnum.optional().describe("Filter by customer tier"),
+  state: stateEnum.optional().describe("Filter by state code"),
 });
 
 export const listCustomersOutputSchema = z.object({
@@ -166,8 +167,8 @@ export const listCustomersOutputSchema = z.object({
     z.object({
       id: z.string(),
       name: z.string(),
-      tier: z.string(),
-      state: z.string(),
+      tier: tierEnum,
+      state: stateEnum,
     }),
   ),
 });
