@@ -10,14 +10,16 @@ With regular AI SDK tools, each tool adds its full schema to the context. With 1
 
 Shell tools consolidate all operations into a single bash tool with a compact description. The agent discovers available commands from the bash tool description.
 
-## Running the Examples
+## Running the Example
 
 ```bash
-# Shell tools approach (15 tools via single bash tool)
 npx tsx examples/shell-tools/many-tools/index.ts
+```
 
-# Baseline comparison (15 separate AI SDK tools)
-npx tsx examples/shell-tools/many-tools/baseline.ts
+To compare against baseline (15 separate AI SDK tools), run the evaluation:
+
+```bash
+npx tsx examples/shell-tools/evals/many-tools.eval.ts
 ```
 
 ## CRM Tools Included

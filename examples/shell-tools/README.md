@@ -130,51 +130,91 @@ const { tools } = await createBashTool({
 
 ### Many Tools
 
-The `many-tools/` subdirectory shows shell tools with many related operations (15 CRM tools). Includes a baseline for testing:
+The `many-tools/` subdirectory shows shell tools with many related operations (15 CRM tools):
 
 ```bash
-npx tsx examples/shell-tools/many-tools/index.ts      # Shell tools
-npx tsx examples/shell-tools/many-tools/baseline.ts   # Baseline (for testing)
+npx tsx examples/shell-tools/many-tools/index.ts
 ```
 
 ### Piping
 
-The `piping/` subdirectory shows shell tools with jq piping for complex queries. Includes a baseline for testing:
+The `piping/` subdirectory shows shell tools with jq piping for complex queries:
 
 ```bash
-npx tsx examples/shell-tools/piping/index.ts      # Shell tools + jq
-npx tsx examples/shell-tools/piping/baseline.ts   # Baseline (for testing)
+npx tsx examples/shell-tools/piping/index.ts
 ```
 
 ### Composing
 
-The `composing/` subdirectory tests whether bash scripting can save LLM round-trips by executing multiple tool calls in one script.
+The `composing/` subdirectory tests whether bash scripting can save LLM round-trips by executing multiple tool calls in one script:
 
 ```bash
-npx tsx examples/shell-tools/composing/index.ts      # Shell tools version
-npx tsx examples/shell-tools/composing/baseline.ts   # Baseline (for comparison)
-npx tsx examples/shell-tools/composing/compare.ts    # Run both and compare
+npx tsx examples/shell-tools/composing/index.ts
 ```
 
-**Scenario: User + Team Join**
+## Evaluations
 
-The prompt asks: "Get the full details for user 'alice', including their team's name and department."
+The `evals/` subdirectory contains evaluation scripts that compare shell tools against native AI SDK tools with automatic assertions.
 
-This requires:
-1. Get user → extract teamId
-2. Get team using that teamId
-3. Combine results
+### Running Evaluations
 
-**Expected behavior (not yet achieved):**
-
-Shell tools version COULD do this in one bash call:
 ```bash
-user=$(get-user --id alice)
-team_id=$(echo "$user" | jq -r '.teamId')
-get-team --id "$team_id"
+# Run individual evaluations
+npx tsx examples/shell-tools/evals/basic.eval.ts       # Basic user/email example
+npx tsx examples/shell-tools/evals/piping.eval.ts      # jq piping example
+npx tsx examples/shell-tools/evals/many-tools.eval.ts  # 15 CRM tools example
+npx tsx examples/shell-tools/evals/composing.eval.ts   # Multi-step scripting example
 ```
 
-But currently the agent makes 2 separate calls, same as baseline.
+### Evaluation Output
 
-**Current status:** This example serves as a test case for improving the bash tool prompt. See `CONTEXT.md` for investigation notes and next steps.
+Each evaluation:
+- Runs both shell tools and baseline versions
+- Tracks metrics: tool calls, tokens, steps, duration
+- Runs configurable assertions
+- Prints PASS/FAIL results to console
+- Saves detailed JSON output to `evals/data/*-output.json` (gitignored)
+- Exits with code 1 if assertions fail
+
+### Assertion Configuration
+
+Evaluations automatically assert:
+- **fewerToolCalls**: Shell tools must use fewer or equal tool calls than baseline
+- **fewerTokens**: Shell tools must use fewer or equal tokens than baseline
+
+Additional configurable assertions:
+- `requiredResponseTerms`: Terms that must appear in both responses
+- `custom`: Custom assertion functions
+
+### Example Output
+
+```
+============================================================
+Evaluation: Basic Shell Tools Example
+============================================================
+
+Prompt: "Send a welcome email to usr_1 using their actual email from the database."
+
+--- Running Shell Tools Version ---
+Shell tools: 2 calls, 1234 tokens, 2 steps, 1500ms
+
+--- Running Baseline Version ---
+Baseline: 2 calls, 1100 tokens, 2 steps, 1200ms
+
+--- Assertion Results ---
+✓ PASS: maxToolCallRatio
+       Tool call ratio 1.00 <= 1.5
+✓ PASS: maxTokenRatio
+       Token ratio 1.12 <= 2.0
+✓ PASS: responseContains("alice")
+       Both responses contain "alice"
+
+--- Summary ---
+Shell Tools: 2 calls, 1234 tokens, 2 steps
+Baseline:    2 calls, 1100 tokens, 2 steps
+
+✓ All assertions passed
+
+Results saved to examples/shell-tools/evals/basic-output.json
+```
 

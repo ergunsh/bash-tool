@@ -31,3 +31,6 @@ coverage/
 todo/
 .vercel
 .env*.local
+
+# Eval outputs
+examples/shell-tools/evals/data/

@@ -23,14 +23,16 @@ list-orders --status completed | jq '[.orders[] | select(.customer.tier == "prem
 
 One command. One LLM round-trip. The data processing happens in `jq`, not the LLM.
 
-## Running the Examples
+## Running the Example
 
 ```bash
-# Shell tools + jq piping
 npx tsx examples/shell-tools/piping/index.ts
+```
 
-# Baseline (regular tools, multiple round-trips)
-npx tsx examples/shell-tools/piping/baseline.ts
+To compare against baseline (regular AI SDK tools), run the evaluation:
+
+```bash
+npx tsx examples/shell-tools/evals/piping.eval.ts
 ```
 
 ## The Query
