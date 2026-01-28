@@ -89,8 +89,9 @@ function getShape(
 
 /**
  * Get a compact output type description for the prompt.
+ * Shows nested structure for arrays of objects and enum values to help with jq queries.
  */
-function getOutputDescription(schema: z.ZodTypeAny): string {
+function getOutputDescription(schema: z.ZodTypeAny, depth = 0): string {
   const inner = getInnerType(schema);
   const typeName = inner._def.typeName;
 
@@ -100,14 +101,44 @@ function getOutputDescription(schema: z.ZodTypeAny): string {
 
     const fields = Object.entries(shape).map(([key, fieldSchema]) => {
       const optional = isOptional(fieldSchema);
+      const fieldInner = getInnerType(fieldSchema);
+      const fieldTypeName = fieldInner._def.typeName;
+
+      // For nested objects at shallow depth, show their fields
+      if (fieldTypeName === "ZodObject" && depth < 2) {
+        const nestedDesc = getOutputDescription(fieldSchema, depth + 1);
+        return optional ? `${key}?:${nestedDesc}` : `${key}:${nestedDesc}`;
+      }
+
+      // For arrays of objects, show element structure
+      if (fieldTypeName === "ZodArray" && depth < 2) {
+        const elementType = fieldInner._def.type as z.ZodTypeAny;
+        const elementInner = getInnerType(elementType);
+        if (elementInner._def.typeName === "ZodObject") {
+          const elementDesc = getOutputDescription(elementType, depth + 1);
+          return optional ? `${key}?[]${elementDesc}` : `${key}[]${elementDesc}`;
+        }
+      }
+
+      // For enums, show the values
+      if (fieldTypeName === "ZodEnum") {
+        const values = getEnumValues(fieldSchema);
+        const enumStr = values.join("|");
+        return optional ? `${key}?:<${enumStr}>` : `${key}:<${enumStr}>`;
+      }
+
       return optional ? `${key}?` : key;
     });
 
-    return `{ ${fields.join(", ")} }`;
+    return `{${fields.join(", ")}}`;
   }
 
   if (typeName === "ZodArray") {
     const elementType = inner._def.type as z.ZodTypeAny;
+    const elementInner = getInnerType(elementType);
+    if (elementInner._def.typeName === "ZodObject" && depth < 2) {
+      return `${getOutputDescription(elementType, depth + 1)}[]`;
+    }
     return `${getOutputTypeLabel(elementType)}[]`;
   }
 
@@ -210,6 +241,11 @@ export function generateShellToolsPrompt(
   }
 
   lines.push("Run any tool with --help for detailed documentation.");
+  lines.push("");
+  lines.push("EFFICIENCY: Combine operations in ONE bash call to minimize round-trips:");
+  lines.push("  Pipe: tool | jq '[.items[] | select(.field == \"x\") | .val] | add'");
+  lines.push("  Chain: a=$(tool-a); tool-b --id $(echo \"$a\" | jq -r '.ref')");
+  lines.push("  Batch: for id in x y z; do tool --id $id; done | jq -s '[.[].val] | add'");
 
   return lines.join("\n");
 }
