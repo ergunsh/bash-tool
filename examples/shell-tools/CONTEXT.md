@@ -111,13 +111,6 @@ get-team --id "$team_id"
 
 This confirms: **"Not shown as possible"** - the agent doesn't realize it can write multi-step bash scripts.
 
-## Next Steps
-
-1. ✅ Test case built and confirmed the hypothesis
-2. **TODO:** Update the bash tool prompt to educate the agent about scripting capabilities
-3. Don't overindex on jq - also consider grep, sed, file operations
-4. Re-run comparison after prompt improvements
-
 ## Key Realization
 
 The value proposition of shell tools isn't just about jq filtering - it's about **eliminating LLM round-trips** by letting the agent write scripts that:
@@ -125,3 +118,147 @@ The value proposition of shell tools isn't just about jq filtering - it's about 
 - Store intermediate results in variables
 - Combine/transform data
 - Return only the final result to the LLM
+
+---
+
+## Session 2: Prompt Improvements & New Batch Eval (2026-01-28)
+
+### Changes Made
+
+#### 1. Improved Output Schema Display (`src/shell-tools/prompt-generator.ts`)
+
+Modified `getOutputDescription()` to show nested object structures and enum values:
+
+**Before:**
+```
+Output: JSON { orders }
+```
+
+**After:**
+```
+Output: JSON {orders[]{id, customer:{id, name, tier:<premium|standard>, state:<CA|NY|TX>}, total, status:<completed|pending|refunded>}}
+```
+
+This helps the agent understand:
+- Nested field paths (e.g., `.customer.tier`, `.customer.state`)
+- Valid enum values (e.g., "CA" not "California")
+
+#### 2. Added Efficiency Guidance
+
+Added three patterns to the shell tools prompt:
+
+```
+EFFICIENCY: Combine operations in ONE bash call to minimize round-trips:
+  Pipe: tool | jq '[.items[] | select(.field == "x") | .val] | add'
+  Chain: a=$(tool-a); tool-b --id $(echo "$a" | jq -r '.ref')
+  Batch: for id in x y z; do tool --id $id; done | jq -s '[.[].val] | add'
+```
+
+#### 3. Added Enums to Piping Example (`examples/shell-tools/piping/shared.ts`)
+
+Changed string fields to enums so the agent knows valid values:
+```typescript
+const statusEnum = z.enum(["completed", "pending", "refunded"]);
+const tierEnum = z.enum(["premium", "standard"]);
+const stateEnum = z.enum(["CA", "NY", "TX"]);
+```
+
+#### 4. Created Batch Operations Eval (`examples/shell-tools/evals/batch.eval.ts`)
+
+New eval that tests for-each loop operations:
+- **Prompt:** "Get the total account balance for all active users"
+- **Baseline:** Must call `listUserIds` then `getUser` 4 times (5 total calls)
+- **Shell tools:** Can use a for-loop to batch all user fetches
+
+#### 5. Updated All Evals to Use Sonnet
+
+Changed from `claude-haiku-4.5` to `claude-sonnet-4.5` for more consistent results.
+
+### Eval Results
+
+| Eval | Shell Calls | Baseline Calls | Shell Tokens | Baseline Tokens | Status |
+|------|-------------|----------------|--------------|-----------------|--------|
+| **piping** | 1 | 2 | 1255 | 1759 | ✓ **PASS** |
+| **batch** | 2 | 5 | 1647 | 1380 | ✗ calls great, tokens fail |
+| **basic** | 2 | 2 | 1464 | 1203 | ✗ same calls |
+| **composing** | 2 | 2 | 1478 | 1084 | ✗ same calls |
+| **many-tools** | 7 | 5 | 2943 | 2500 | ✗ worse |
+
+### What's Working
+
+#### Piping Eval ✓
+Agent successfully used jq piping in ONE call:
+```bash
+list-orders --status completed | jq '[.orders[] | select(.customer.tier == "premium" and .customer.state == "CA") | .total] | add'
+```
+- Used enum values correctly ("CA" not "California")
+- Filtered by nested fields (`.customer.tier`, `.customer.state`)
+- Aggregated with `add`
+
+#### Batch Eval (Partial Success)
+Agent used for-loop to reduce calls from 5 to 2:
+```bash
+for id in usr_1 usr_2 usr_4 usr_5; do get-user --id $id; done | jq -s '{users: [.[] | {name: .name, balance: .balance}], total: ([.[].balance] | add)}'
+```
+- Great call reduction (2 vs 5)
+- Tokens still higher due to prompt overhead
+
+### What's NOT Working
+
+#### Composing Eval
+Agent still makes 2 separate calls instead of chaining:
+- **Actual:** `get-user --id alice` then `get-team --id team_eng`
+- **Ideal:** `user=$(get-user --id alice); get-team --id $(echo "$user" | jq -r '.teamId')`
+
+The agent recognizes the data dependency but chooses to make separate calls rather than write a chained script.
+
+#### Token Overhead Problem
+Shell tools has ~250 token overhead per LLM call due to:
+1. Larger bash tool description (includes all shell tools documentation)
+2. Efficiency guidance text
+
+**Break-even analysis:** Shell tools only wins on tokens when it saves 1+ LLM round-trips. For tasks where both make the same number of calls, baseline always wins on tokens.
+
+### Root Cause Analysis
+
+1. **Piping works** because:
+   - One tool's output contains ALL needed data (orders have embedded customer info)
+   - Simple jq pipe can filter and aggregate
+   - No need to call multiple tools
+
+2. **Batch works** because:
+   - Clear loop pattern (for-each over list)
+   - Efficiency guidance shows exact for-loop syntax
+   - Agent recognizes the batch opportunity
+
+3. **Composing doesn't work** because:
+   - Chaining requires more complex bash syntax
+   - Agent may perceive 2 simple calls as easier than 1 complex script
+   - The benefit (1 fewer round-trip) may not seem worth the complexity
+
+### Next Steps
+
+1. **Reduce prompt overhead:**
+   - Remove "Common operations" section when shell tools are present
+   - Make shell tools documentation more compact
+   - Consider lazy loading tool docs (only show relevant ones)
+
+2. **Improve chaining guidance:**
+   - Make the Chain example more prominent or add more examples
+   - Consider detecting when tools have foreign key relationships and suggesting chaining
+
+3. **Adjust eval assertions:**
+   - Consider changing `fewerTokens` assertion to only apply when calls are reduced
+   - Or accept that token overhead is fundamental and focus on call reduction
+
+4. **Explore alternative approaches:**
+   - Could the agent be told to "prefer combining operations" in system prompt?
+   - Could we detect sequential dependencies and suggest scripting?
+
+### Files Changed
+
+- `src/shell-tools/prompt-generator.ts` - Nested schema display + efficiency guidance
+- `examples/shell-tools/piping/shared.ts` - Added enums
+- `examples/shell-tools/evals/piping.eval.ts` - Changed to Sonnet
+- `examples/shell-tools/evals/basic.eval.ts` - Changed to Sonnet
+- `examples/shell-tools/evals/batch.eval.ts` - NEW FILE
