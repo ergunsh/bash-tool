@@ -27,7 +27,12 @@ import {
 
 const users: Record<
   string,
-  { name: string; email: string; balance: number; status: "active" | "inactive" }
+  {
+    name: string;
+    email: string;
+    balance: number;
+    status: "active" | "inactive";
+  }
 > = {
   usr_1: {
     name: "Alice Johnson",
@@ -101,7 +106,11 @@ async function executeListUserIds({
   };
 }
 
-async function executeGetUser({ id }: z.infer<typeof getUserInputSchema>): Promise<z.infer<typeof getUserOutputSchema>> {
+async function executeGetUser({
+  id,
+}: z.infer<typeof getUserInputSchema>): Promise<
+  z.infer<typeof getUserOutputSchema>
+> {
   const user = users[id];
   if (!user) {
     throw new Error(`User not found: ${id}`);

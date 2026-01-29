@@ -23,11 +23,10 @@ describe("generateShellToolsPrompt", () => {
       },
     });
 
-    expect(result).toContain("Available shell tools:");
-    expect(result).toContain("fetch-user # Fetches a user from the database");
-    expect(result).toContain(
-      "Run <tool> --help before first use to see usage, flags, and output format.",
-    );
+    expect(result).toContain("CUSTOM SHELL TOOLS");
+    expect(result).toContain("no positional args");
+    expect(result).toContain("fetch-user - Fetches a user from the database");
+    expect(result).toContain("MUST run <tool> --help before first use");
     // Should NOT contain usage details (progressive disclosure)
     expect(result).not.toContain("--id <string>");
     expect(result).not.toContain("Output:");

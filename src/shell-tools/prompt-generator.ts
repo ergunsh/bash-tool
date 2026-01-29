@@ -9,11 +9,11 @@ import type { ShellToolDefinition } from "./types.js";
  *
  * @example
  * ```
- * Available shell tools:
- *   fetch-user # Fetches a user from the database
- *   list-users # Lists all users in the database
+ * CUSTOM SHELL TOOLS (all require --flag args, no positional args):
+ *   fetch-user - Fetches a user from the database
+ *   list-users - Lists all users in the database
  *
- * Run <tool> --help before first use to see usage, flags, and output format.
+ * IMPORTANT: You MUST run <tool> --help before first use to see required flags and output format.
  * ```
  */
 export function generateShellToolsPrompt(
@@ -25,19 +25,31 @@ export function generateShellToolsPrompt(
     return "";
   }
 
-  const lines: string[] = ["Available shell tools:"];
+  const lines: string[] = [
+    "CUSTOM SHELL TOOLS (all require --flag args, no positional args):",
+  ];
 
   for (const name of toolNames) {
     const kebabName = toKebabCase(name);
     const { description } = shellTools[name];
-    lines.push(`  ${kebabName} # ${description}`);
+    lines.push(`  ${kebabName} - ${description}`);
   }
 
   lines.push("");
   lines.push(
-    "Run <tool> --help before first use to see usage, flags, and output format.",
+    "IMPORTANT: You MUST run <tool> --help before first use to see required flags and output format.",
   );
   lines.push("");
+  lines.push(
+    "EFFICIENCY: Combine operations in ONE bash call to minimize round-trips:",
+  );
+  lines.push(
+    "  Pipe: tool | jq '[.items[] | select(.field == \"x\") | .val] | add'",
+  );
+  lines.push("  Chain: a=$(tool-a); tool-b --id $(echo \"$a\" | jq -r '.ref')");
+  lines.push(
+    "  Batch: for id in x y z; do tool --id $id; done | jq -s '[.[].val] | add'",
+  );
 
   return lines.join("\n");
 }

@@ -329,12 +329,12 @@ describe("shell tools integration", () => {
         shellTools: { fetchUser },
       });
 
-      expect(tools.bash.description).toContain("Available shell tools:");
+      expect(tools.bash.description).toContain("CUSTOM SHELL TOOLS");
       expect(tools.bash.description).toContain(
         "fetch-user - Fetches a user from the database",
       );
       expect(tools.bash.description).toContain(
-        "Run <tool> --help before first use to see usage, flags, and output format.",
+        "MUST run <tool> --help before first use",
       );
       // Progressive disclosure: no usage details in main prompt
       expect(tools.bash.description).not.toContain("--id <string>");
