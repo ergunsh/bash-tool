@@ -1,8 +1,8 @@
 /**
  * Piping Shell Tools Evaluation
  *
- * Tests shell tools with jq piping for complex queries.
- * This scenario benefits from piping: calculating totals from filtered data.
+ * Tests shell tools with multi-step pipeline chaining.
+ * This scenario benefits from scripting: list IDs then fetch each.
  *
  * Run with: npx tsx examples/shell-tools/evals/piping.eval.ts
  */
@@ -14,15 +14,12 @@ import {
 } from "../../../src/index.js";
 import {
   descriptions,
-  executeListCustomers,
-  executeListOrders,
-  executeListProducts,
-  listCustomersInputSchema,
-  listCustomersOutputSchema,
-  listOrdersInputSchema,
-  listOrdersOutputSchema,
-  listProductsInputSchema,
-  listProductsOutputSchema,
+  executeGetOrder,
+  executeListOrderIds,
+  getOrderInputSchema,
+  getOrderOutputSchema,
+  listOrderIdsInputSchema,
+  listOrderIdsOutputSchema,
   prompt,
 } from "../piping/shared.js";
 import {
@@ -37,32 +34,24 @@ import {
 async function runShellToolsVersion(): Promise<RunResult> {
   const calls: ToolCall[] = [];
 
-  const listOrders = createShellTool({
-    description: descriptions.listOrders,
-    inputSchema: listOrdersInputSchema,
-    outputSchema: listOrdersOutputSchema,
-    execute: executeListOrders,
+  const listOrderIds = createShellTool({
+    description: descriptions.listOrderIds,
+    inputSchema: listOrderIdsInputSchema,
+    outputSchema: listOrderIdsOutputSchema,
+    execute: executeListOrderIds,
   });
 
-  const listCustomers = createShellTool({
-    description: descriptions.listCustomers,
-    inputSchema: listCustomersInputSchema,
-    outputSchema: listCustomersOutputSchema,
-    execute: executeListCustomers,
-  });
-
-  const listProducts = createShellTool({
-    description: descriptions.listProducts,
-    inputSchema: listProductsInputSchema,
-    outputSchema: listProductsOutputSchema,
-    execute: executeListProducts,
+  const getOrder = createShellTool({
+    description: descriptions.getOrder,
+    inputSchema: getOrderInputSchema,
+    outputSchema: getOrderOutputSchema,
+    execute: executeGetOrder,
   });
 
   const { tools } = await createBashTool({
     shellTools: {
-      listOrders,
-      listCustomers,
-      listProducts,
+      listOrderIds,
+      getOrder,
     },
   });
 
@@ -92,30 +81,23 @@ async function runShellToolsVersion(): Promise<RunResult> {
 async function runBaselineVersion(): Promise<RunResult> {
   const calls: ToolCall[] = [];
 
-  const listOrders = tool({
-    description: descriptions.listOrders,
-    inputSchema: listOrdersInputSchema,
-    execute: executeListOrders,
+  const listOrderIds = tool({
+    description: descriptions.listOrderIds,
+    inputSchema: listOrderIdsInputSchema,
+    execute: executeListOrderIds,
   });
 
-  const listCustomers = tool({
-    description: descriptions.listCustomers,
-    inputSchema: listCustomersInputSchema,
-    execute: executeListCustomers,
-  });
-
-  const listProducts = tool({
-    description: descriptions.listProducts,
-    inputSchema: listProductsInputSchema,
-    execute: executeListProducts,
+  const getOrder = tool({
+    description: descriptions.getOrder,
+    inputSchema: getOrderInputSchema,
+    execute: executeGetOrder,
   });
 
   const agent = new ToolLoopAgent({
     model: "anthropic/claude-sonnet-4.5",
     tools: {
-      listOrders,
-      listCustomers,
-      listProducts,
+      listOrderIds,
+      getOrder,
     },
     instructions:
       "You are a helpful analytics assistant. Use the available tools to query data and answer questions.",
@@ -144,8 +126,9 @@ async function main() {
     runShellTools: runShellToolsVersion,
     runBaseline: runBaselineVersion,
     assertions: {
-      // The prompt asks about revenue from premium CA customers
-      requiredResponseTerms: ["revenue", "premium", "california"],
+      // The prompt asks about total amount spent by cust_1
+      // cust_1 has orders: ord_1 (199.98), ord_3 (89.97), ord_5 (124.95) = 414.90
+      requiredResponseTerms: ["total", "199", "89", "124"],
     },
     outputPath: "examples/shell-tools/evals/data/piping-output.json",
   });

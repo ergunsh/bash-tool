@@ -8,7 +8,7 @@ describe("generateShellToolsPrompt", () => {
     expect(result).toBe("");
   });
 
-  it("generates prompt with tool name and description", () => {
+  it("generates prompt with usage signature and description", () => {
     const result = generateShellToolsPrompt({
       fetchUser: {
         description: "Fetches a user from the database",
@@ -23,13 +23,11 @@ describe("generateShellToolsPrompt", () => {
       },
     });
 
-    expect(result).toContain("CUSTOM SHELL TOOLS");
-    expect(result).toContain("no positional args");
-    expect(result).toContain("fetch-user - Fetches a user from the database");
-    expect(result).toContain("MUST run <tool> --help before first use");
-    // Should NOT contain usage details (progressive disclosure)
-    expect(result).not.toContain("--id <string>");
-    expect(result).not.toContain("Output:");
+    expect(result).toContain("SHELL TOOLS:");
+    // Shows usage signature with flags upfront (no --help needed)
+    expect(result).toContain("fetch-user --id <string>");
+    // Should NOT require --help (new strategy)
+    expect(result).not.toContain("MUST run <tool> --help");
   });
 
   it("generates prompt for multiple tools", () => {
@@ -51,12 +49,9 @@ describe("generateShellToolsPrompt", () => {
       },
     });
 
-    expect(result).toContain("fetch-user - Fetches a user");
-    expect(result).toContain("send-email - Sends an email");
-    // Should NOT contain usage details
-    expect(result).not.toContain("--id <string>");
-    expect(result).not.toContain("--to <string>");
-    expect(result).not.toContain("Output:");
+    // Shows usage signatures upfront (compact - no descriptions)
+    expect(result).toContain("fetch-user --id <string>");
+    expect(result).toContain("send-email --to <string> --subject <string>");
   });
 
   it("converts camelCase to kebab-case", () => {
@@ -72,6 +67,8 @@ describe("generateShellToolsPrompt", () => {
       },
     });
 
-    expect(result).toContain("get-user-by-id - Gets user by ID");
+    expect(result).toContain(
+      "get-user-by-id --user-id <string> [--include-metadata]",
+    );
   });
 });

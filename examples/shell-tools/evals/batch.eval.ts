@@ -166,7 +166,7 @@ async function runShellToolsVersion(): Promise<RunResult> {
     model: "anthropic/claude-sonnet-4.5",
     tools: { bash: tools.bash },
     instructions:
-      "You are a helpful assistant. Use the bash tool to help users with their requests. Prefer combining operations in a single bash call when possible.",
+      "You are a helpful assistant. Use the bash tool to help users with their requests.",
     onStepFinish: createStepHandler(calls),
   });
 

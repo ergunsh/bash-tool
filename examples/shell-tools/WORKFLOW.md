@@ -142,75 +142,35 @@ git commit -m "Strategy A: add usage signatures - basic/composing pass"
 
 ## Eval Scenarios
 
-### basic (2 tools, baseline ~1200 tokens)
-- **Prompt**: "Send a welcome email to usr_1 using their actual email from the database."
-- **Baseline**: 2 calls, 3 steps (fetchUser, sendEmail)
-- **Ideal shell**: 1 bash call that chains both operations:
-  ```bash
-  user=$(fetch-user --id usr_1)
-  email=$(echo "$user" | jq -r '.email')
-  name=$(echo "$user" | jq -r '.name')
-  send-email --to "$email" --subject "Welcome!" --body "Welcome, $name!"
-  ```
-- **Token math**: Must complete in 2 steps or fewer (vs baseline's 3), or have a smaller prompt overhead
-
-### composing (2 tools, baseline ~1070 tokens)
-- **Prompt**: "Get the full details for user 'alice', including their team's name and department."
-- **Baseline**: 2 calls, 3 steps (getUser, getTeam)
-- **Ideal shell**: 1 bash call that chains and combines:
-  ```bash
-  user=$(get-user --id alice)
-  team_id=$(echo "$user" | jq -r '.teamId')
-  team=$(get-team --id "$team_id")
-  echo "$user" | jq --argjson team "$team" '. + {team: $team}'
-  ```
-- **Token math**: Tightest margin. Must complete in 2 steps AND have minimal prompt overhead
-
-### piping (2 tools, baseline ~1760 tokens)
-- **Prompt**: "What's the total revenue from completed orders placed by premium customers in California?"
-- **Baseline**: 2 calls, 2 steps (listOrders + listCustomers called in parallel)
-- **Ideal shell**: 1 bash call with jq filtering:
-  ```bash
-  list-orders --status completed | jq '
-    [.orders[]
-     | select(.customer.tier == "premium" and .customer.state == "CA")
-     | .total
-    ] | add
-  '
-  ```
-- **Token math**: Baseline only uses 2 steps, so shell tools needs to match that AND have a smaller per-step cost. The win here is that the baseline sends the full orders list back to the LLM, while shell tools filters it in jq.
-
-### many-tools (15 tools, baseline ~2500 tokens)
+### many-tools ✅ (15 tools, PASSING)
 - **Prompt**: "Give me a summary of Acme Corp - their contacts, open deals, and recent activities."
 - **Baseline**: 5 calls, 3 steps across 15 available tools
-- **Ideal shell**: 1 bash call that chains all lookups:
-  ```bash
-  id=$(search-customers --query "Acme Corp" | jq -r '.results[0].id')
-  echo "=== Customer ==="
-  get-customer --id "$id"
-  echo "=== Contacts ==="
-  list-contacts --customer-id "$id"
-  echo "=== Deals ==="
-  list-deals --customer-id "$id"
-  echo "=== Activities ==="
-  list-activities --customer-id "$id"
-  ```
-- **Token math**: Best case for shell tools. 15 tool schemas in the baseline is huge. Compact shell tools listing saves significant prompt tokens.
+- **Why shell tools wins**: 15 tool schemas in baseline is huge (~2500 tokens). Shell tools' compact listing is much smaller.
+- **Status**: PASSING - this is the showcase eval for shell tools' prompt efficiency advantage.
 
-### batch (2 tools, baseline ~1380 tokens)
+### basic ❌ (2 tools, currently failing)
+- **Prompt**: "Send a welcome email to usr_1 using their actual email from the database."
+- **Baseline**: 2 calls, 3 steps (fetchUser, sendEmail)
+- **Current issue**: Shell tools has ~60 tokens more overhead per step than baseline's 2 small tool schemas. Same step count means baseline wins.
+- **Needs redesign**: Pattern C (Aggregation) or Pattern A (Large Data) to create a scenario where shell tools' filtering/computation saves tokens.
+
+### composing ❌ (2 tools, currently failing)
+- **Prompt**: "Get the full details for user 'alice', including their team's name and department."
+- **Baseline**: 2 calls, 3 steps (getUser, getTeam)
+- **Current issue**: Same as basic - 2 tools means baseline has lower overhead, same steps means baseline wins.
+- **Needs redesign**: Pattern B (Deep Chain) - add a 3rd level of dependency that can't be parallelized.
+
+### piping ❌ (2 tools, currently failing)
+- **Prompt**: "What's the total amount spent by customer cust_1?"
+- **Baseline**: 4 calls, 3 steps (listOrderIds + 3x getOrder in parallel)
+- **Current issue**: Baseline parallelizes the getOrder calls. Shell tools makes sequential calls.
+- **Needs redesign**: Pattern A (Large Data) - make the tool return LARGE payloads so jq filtering saves tokens.
+
+### batch ❌ (2 tools, currently failing)
 - **Prompt**: "Get the total account balance for all active users."
-- **Baseline**: 5 calls, 3 steps (listUserIds + 4x getUser)
-- **Ideal shell**: 1 bash call with for-loop:
-  ```bash
-  ids=$(list-user-ids --status active | jq -r '.userIds[]')
-  for id in $ids; do
-    get-user --id "$id"
-  done | jq -s '
-    map({name, balance})
-    | {users: ., total: (map(.balance) | add)}
-  '
-  ```
-- **Token math**: Baseline uses 3 steps. If shell tools can do it in 2 steps with a for-loop, it saves a full round-trip.
+- **Baseline**: 5 calls, 3 steps (listUserIds + 4x getUser in parallel)
+- **Current issue**: Same as piping - baseline parallelizes, shell tools is sequential.
+- **Needs redesign**: Pattern A (Large Data) + Pattern C (Aggregation)
 
 ## The Core Tradeoff
 
@@ -221,6 +181,49 @@ Shell tools has an inherent **per-round-trip prompt overhead** because the bash 
 - **Adding 1 wasted round-trip** (e.g., `--help` call or syntax error) costs ~500-1000 tokens
 - **For 2-3 tool scenarios**, shell tools prompt overhead is ~200-400 tokens more than baseline per round-trip, so it MUST save at least 1 round-trip to break even
 - **For many-tool scenarios** (15+), shell tools prompt is already smaller than 15 separate tool schemas, so it wins per-round-trip even without batching
+
+## Structural Limitations (Important!)
+
+Shell tools has **fundamental structural disadvantages** against certain patterns. Understanding these is critical for eval design.
+
+### Baseline's Parallel Tool Calling Advantage
+
+The AI SDK's ToolLoopAgent can call **multiple independent tools in parallel** within a single step. For example:
+- Step 1: `listUserIds()` → returns [usr_1, usr_2, usr_3, usr_4]
+- Step 2: `getUser(usr_1)` + `getUser(usr_2)` + `getUser(usr_3)` + `getUser(usr_4)` **ALL IN PARALLEL**
+- Step 3: Response
+
+Shell tools **cannot match this** because bash commands run sequentially. Even if the LLM writes a for-loop, it's still one bash tool call per step, and the loop runs sequentially inside that call.
+
+### Shell Tools Wins When
+
+| Scenario | Why Shell Tools Wins |
+|----------|---------------------|
+| **Many tools (10+)** | Compact listing is smaller than 10+ full tool schemas |
+| **Large data filtering** | jq filters data before returning to LLM, reducing output tokens |
+| **Deep sequential chains** | Where step 2 REQUIRES step 1's output (can't parallelize anyway) |
+| **Complex aggregations** | jq computes sums/averages vs LLM doing mental math |
+
+### Shell Tools Loses When
+
+| Scenario | Why Baseline Wins |
+|----------|------------------|
+| **Few tools (2-3)** | Baseline's small schemas < shell tools' bash overhead |
+| **Fan-out patterns** | Baseline parallelizes N calls in 1 step; shell tools needs N sequential |
+| **Simple lookups** | Same steps, but baseline has lower per-step overhead |
+
+### Eval Design Implications
+
+For evals where shell tools should win:
+1. **Pattern A (Large Data)**: Tool returns 100+ records, query needs subset → jq filters
+2. **Pattern B (Deep Chain)**: 3+ sequential dependencies → can't parallelize
+3. **Pattern C (Aggregation)**: Query needs computed result → jq vs LLM mental math
+4. **Pattern D (Many Tools)**: 10+ tools available → compact listing wins
+
+Avoid evals with:
+- Fan-out patterns (get list, then fetch each) - baseline parallelizes
+- 2-3 tools with simple queries - baseline has lower overhead
+- Scenarios where LLM scripting is optional - LLM prefers simple calls
 
 ## Strategies to Explore
 

@@ -329,16 +329,11 @@ describe("shell tools integration", () => {
         shellTools: { fetchUser },
       });
 
-      expect(tools.bash.description).toContain("CUSTOM SHELL TOOLS");
-      expect(tools.bash.description).toContain(
-        "fetch-user - Fetches a user from the database",
-      );
-      expect(tools.bash.description).toContain(
-        "MUST run <tool> --help before first use",
-      );
-      // Progressive disclosure: no usage details in main prompt
-      expect(tools.bash.description).not.toContain("--id <string>");
-      expect(tools.bash.description).not.toContain("Output:");
+      expect(tools.bash.description).toContain("SHELL TOOLS:");
+      // Shows usage signature upfront (no --help needed)
+      expect(tools.bash.description).toContain("fetch-user --id <string>");
+      // Should NOT require --help (new strategy)
+      expect(tools.bash.description).not.toContain("MUST run <tool> --help");
     });
   });
 

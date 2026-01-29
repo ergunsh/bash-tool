@@ -1,8 +1,13 @@
 /**
  * Shared tool definitions for piping example.
  *
- * This module defines schemas and execute functions once,
- * which are then used to create both shell tools and AI SDK tools.
+ * This scenario tests multi-step pipeline where shell tools can chain:
+ * 1. Get order IDs for a customer
+ * 2. Fetch each order's details
+ * 3. Sum the totals
+ *
+ * Baseline: Multiple round-trips (list IDs, then fetch each order)
+ * Shell tools: One bash call with for-loop chaining
  */
 
 import { z } from "zod";
@@ -14,8 +19,6 @@ export const db = {
     {
       id: "ord_1",
       customerId: "cust_1",
-      productId: "prod_1",
-      quantity: 2,
       total: 199.98,
       status: "completed",
       date: "2024-01-15",
@@ -23,8 +26,6 @@ export const db = {
     {
       id: "ord_2",
       customerId: "cust_2",
-      productId: "prod_3",
-      quantity: 1,
       total: 899.99,
       status: "completed",
       date: "2024-01-16",
@@ -32,8 +33,6 @@ export const db = {
     {
       id: "ord_3",
       customerId: "cust_1",
-      productId: "prod_2",
-      quantity: 3,
       total: 89.97,
       status: "pending",
       date: "2024-01-17",
@@ -41,224 +40,84 @@ export const db = {
     {
       id: "ord_4",
       customerId: "cust_3",
-      productId: "prod_1",
-      quantity: 1,
       total: 99.99,
       status: "completed",
       date: "2024-01-18",
     },
     {
       id: "ord_5",
-      customerId: "cust_2",
-      productId: "prod_4",
-      quantity: 2,
-      total: 59.98,
-      status: "completed",
-      date: "2024-01-19",
-    },
-    {
-      id: "ord_6",
-      customerId: "cust_4",
-      productId: "prod_3",
-      quantity: 1,
-      total: 899.99,
-      status: "refunded",
-      date: "2024-01-20",
-    },
-    {
-      id: "ord_7",
       customerId: "cust_1",
-      productId: "prod_5",
-      quantity: 5,
       total: 124.95,
       status: "completed",
       date: "2024-01-21",
     },
-    {
-      id: "ord_8",
-      customerId: "cust_5",
-      productId: "prod_2",
-      quantity: 2,
-      total: 59.98,
-      status: "completed",
-      date: "2024-01-22",
-    },
-    {
-      id: "ord_9",
-      customerId: "cust_3",
-      productId: "prod_4",
-      quantity: 1,
-      total: 29.99,
-      status: "pending",
-      date: "2024-01-23",
-    },
-    {
-      id: "ord_10",
-      customerId: "cust_2",
-      productId: "prod_1",
-      quantity: 3,
-      total: 299.97,
-      status: "completed",
-      date: "2024-01-24",
-    },
   ],
   customers: new Map([
-    ["cust_1", { name: "Alice Johnson", tier: "premium", state: "CA" }],
-    ["cust_2", { name: "Bob Smith", tier: "premium", state: "NY" }],
-    ["cust_3", { name: "Charlie Brown", tier: "standard", state: "CA" }],
-    ["cust_4", { name: "Diana Ross", tier: "standard", state: "TX" }],
-    ["cust_5", { name: "Eve Wilson", tier: "premium", state: "CA" }],
-  ]),
-  products: new Map([
-    [
-      "prod_1",
-      { name: "Wireless Headphones", category: "electronics", price: 99.99 },
-    ],
-    ["prod_2", { name: "Phone Case", category: "accessories", price: 29.99 }],
-    ["prod_3", { name: "Smart Watch", category: "electronics", price: 899.99 }],
-    ["prod_4", { name: "USB Cable", category: "accessories", price: 29.99 }],
-    [
-      "prod_5",
-      { name: "Screen Protector", category: "accessories", price: 24.99 },
-    ],
+    ["cust_1", { name: "Alice Johnson" }],
+    ["cust_2", { name: "Bob Smith" }],
+    ["cust_3", { name: "Charlie Brown" }],
   ]),
 };
 
 // ============ Shared Schemas ============
 
-const statusEnum = z.enum(["completed", "pending", "refunded"]);
-const tierEnum = z.enum(["premium", "standard"]);
-const stateEnum = z.enum(["CA", "NY", "TX"]);
-
-export const listOrdersInputSchema = z.object({
-  status: statusEnum.optional().describe("Filter by order status"),
+export const listOrderIdsInputSchema = z.object({
+  customerId: z.string().describe("The customer ID to get orders for"),
 });
 
-export const listOrdersOutputSchema = z.object({
-  orders: z.array(
-    z.object({
-      id: z.string(),
-      customer: z.object({
-        id: z.string(),
-        name: z.string(),
-        tier: tierEnum,
-        state: stateEnum,
-      }),
-      product: z.object({
-        id: z.string(),
-        name: z.string(),
-        category: z.string(),
-      }),
-      quantity: z.number(),
-      total: z.number(),
-      status: statusEnum,
-      date: z.string(),
-    }),
-  ),
+export const listOrderIdsOutputSchema = z.object({
+  orderIds: z.array(z.string()),
+  count: z.number(),
 });
 
-export const listCustomersInputSchema = z.object({
-  tier: tierEnum.optional().describe("Filter by customer tier"),
-  state: stateEnum.optional().describe("Filter by state code"),
+export const getOrderInputSchema = z.object({
+  id: z.string().describe("The order ID"),
 });
 
-export const listCustomersOutputSchema = z.object({
-  customers: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      tier: tierEnum,
-      state: stateEnum,
-    }),
-  ),
-});
-
-export const listProductsInputSchema = z.object({
-  category: z
-    .string()
-    .optional()
-    .describe("Filter by category: electronics, accessories"),
-});
-
-export const listProductsOutputSchema = z.object({
-  products: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      category: z.string(),
-      price: z.number(),
-    }),
-  ),
+export const getOrderOutputSchema = z.object({
+  id: z.string(),
+  customerId: z.string(),
+  total: z.number(),
+  status: z.string(),
+  date: z.string(),
 });
 
 // ============ Shared Execute Functions ============
 
-export async function executeListOrders({
-  status,
-}: z.infer<typeof listOrdersInputSchema>) {
-  const orders = db.orders
-    .filter((o) => !status || o.status === status)
-    .map((o) => {
-      const customer = db.customers.get(o.customerId);
-      const product = db.products.get(o.productId);
-      if (!customer || !product) throw new Error("Data integrity error");
-      return {
-        id: o.id,
-        customer: {
-          id: o.customerId,
-          name: customer.name,
-          tier: customer.tier,
-          state: customer.state,
-        },
-        product: {
-          id: o.productId,
-          name: product.name,
-          category: product.category,
-        },
-        quantity: o.quantity,
-        total: o.total,
-        status: o.status,
-        date: o.date,
-      };
-    });
-  return { orders };
+export async function executeListOrderIds({
+  customerId,
+}: z.infer<typeof listOrderIdsInputSchema>) {
+  const orderIds = db.orders
+    .filter((o) => o.customerId === customerId)
+    .map((o) => o.id);
+  return { orderIds, count: orderIds.length };
 }
 
-export async function executeListCustomers({
-  tier,
-  state,
-}: z.infer<typeof listCustomersInputSchema>) {
-  const customers = Array.from(db.customers.entries())
-    .filter(
-      ([_, c]) => (!tier || c.tier === tier) && (!state || c.state === state),
-    )
-    .map(([id, c]) => ({ id, name: c.name, tier: c.tier, state: c.state }));
-  return { customers };
-}
-
-export async function executeListProducts({
-  category,
-}: z.infer<typeof listProductsInputSchema>) {
-  const products = Array.from(db.products.entries())
-    .filter(([_, p]) => !category || p.category === category)
-    .map(([id, p]) => ({
-      id,
-      name: p.name,
-      category: p.category,
-      price: p.price,
-    }));
-  return { products };
+export async function executeGetOrder({
+  id,
+}: z.infer<typeof getOrderInputSchema>) {
+  const order = db.orders.find((o) => o.id === id);
+  if (!order) throw new Error(`Order not found: ${id}`);
+  return {
+    id: order.id,
+    customerId: order.customerId,
+    total: order.total,
+    status: order.status,
+    date: order.date,
+  };
 }
 
 // ============ Tool Descriptions ============
 
 export const descriptions = {
-  listOrders: "List all orders with customer and product details embedded",
-  listCustomers: "List all customers",
-  listProducts: "List all products",
+  listOrderIds: "Get all order IDs for a customer",
+  getOrder: "Get order details by ID",
 };
 
 // ============ Prompt ============
 
+// This requires: 1) list IDs, 2) fetch each order, 3) sum totals
+// Baseline: 1 + N calls where N = number of orders (4 calls for cust_1)
+// Shell tools: 1 bash call with for-loop
 export const prompt =
-  "What's the total revenue from completed orders placed by premium customers in California?";
+  "What's the total amount spent by customer cust_1? Show each order and the total.";
