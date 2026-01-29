@@ -117,35 +117,45 @@ Additional configurable assertions:
 - `requiredResponseTerms`: Terms that must appear in both responses
 - `custom`: Custom assertion functions
 
+### Current Results
+
+| Eval | Status | CLI Tools | Baseline | Delta |
+|------|--------|-----------|----------|-------|
+| **basic** | ❌ | 2 calls, 1279 tokens | 2 calls, 1205 tokens | +74 tokens |
+| **composing** | ❌ | 2 calls, 1335 tokens | 2 calls, 1039 tokens | +296 tokens |
+| **piping** | ❌ | 6 calls, 2242 tokens | 4 calls, 1325 tokens | +2 calls, +917 tokens |
+| **many-tools** | ✅ | 5 calls, 2072 tokens | 5 calls, 2528 tokens | **-456 tokens** |
+| **batch** | ❌ | 7 calls, 2014 tokens | 5 calls, 1380 tokens | +2 calls, +634 tokens |
+
+**Key insight**: CLI tools excel when you have **many tools** (15+). The compact CLI tool descriptions are more token-efficient than many separate tool schemas. For fewer tools, the per-round-trip overhead of CLI tools doesn't pay off.
+
 ### Example Output
 
 ```
 ============================================================
-Evaluation: Basic CLI Tools Example
+Evaluation: Many Tools CLI Tools Example
 ============================================================
 
-Prompt: "Send a welcome email to usr_1 using their actual email from the database."
+Prompt: "Give me a summary of Acme Corp - their contacts, open deals, and recent activities."
 
 --- Running CLI Tools Version ---
-CLI tools: 2 calls, 1234 tokens, 2 steps, 1500ms
+CLI tools: 5 calls, 2072 tokens, 3 steps, 10870ms
 
 --- Running Baseline Version ---
-Baseline: 2 calls, 1100 tokens, 2 steps, 1200ms
+Baseline: 5 calls, 2528 tokens, 3 steps, 10250ms
 
 --- Assertion Results ---
-✓ PASS: maxToolCallRatio
-       Tool call ratio 1.00 <= 1.5
-✓ PASS: maxTokenRatio
-       Token ratio 1.12 <= 2.0
-✓ PASS: responseContains("alice")
-       Both responses contain "alice"
+✓ PASS: fewerToolCalls
+       CLI tools: 5 calls <= baseline: 5 calls
+✓ PASS: fewerTokens
+       CLI tools: 2072 tokens <= baseline: 2528 tokens
 
 --- Summary ---
-CLI Tools: 2 calls, 1234 tokens, 2 steps
-Baseline:    2 calls, 1100 tokens, 2 steps
+CLI Tools: 5 calls, 2072 tokens, 3 steps
+Baseline:    5 calls, 2528 tokens, 3 steps
 
 ✓ All assertions passed
 
-Results saved to examples/cli-tools/evals/basic-output.json
+Results saved to examples/cli-tools/evals/data/many-tools-output.json
 ```
 
