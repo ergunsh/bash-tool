@@ -8,7 +8,7 @@ describe("generateShellToolsPrompt", () => {
     expect(result).toBe("");
   });
 
-  it("generates prompt for single tool", () => {
+  it("generates prompt with tool name and description", () => {
     const result = generateShellToolsPrompt({
       fetchUser: {
         description: "Fetches a user from the database",
@@ -23,13 +23,14 @@ describe("generateShellToolsPrompt", () => {
       },
     });
 
-    expect(result).toContain("CUSTOM SHELL TOOLS:");
-    expect(result).toContain("fetch-user --id <string>");
-    expect(result).toContain("Fetches a user from the database");
-    expect(result).toContain("Output: JSON { name, email }");
+    expect(result).toContain("Available shell tools:");
+    expect(result).toContain("fetch-user # Fetches a user from the database");
     expect(result).toContain(
-      "Run any tool with --help for detailed documentation.",
+      "Run <tool> --help before first use to see usage, flags, and output format.",
     );
+    // Should NOT contain usage details (progressive disclosure)
+    expect(result).not.toContain("--id <string>");
+    expect(result).not.toContain("Output:");
   });
 
   it("generates prompt for multiple tools", () => {
@@ -51,74 +52,12 @@ describe("generateShellToolsPrompt", () => {
       },
     });
 
-    expect(result).toContain("fetch-user --id <string>");
-    expect(result).toContain("Fetches a user");
-    expect(result).toContain("send-email --to <string> --subject <string>");
-    expect(result).toContain("Sends an email");
-  });
-
-  it("shows optional fields in brackets", () => {
-    const result = generateShellToolsPrompt({
-      search: {
-        description: "Searches items",
-        inputSchema: z.object({
-          query: z.string(),
-          limit: z.number().optional(),
-          verbose: z.boolean().default(false),
-        }),
-        outputSchema: z.object({ results: z.array(z.string()) }),
-        execute: async () => ({ results: [] }),
-      },
-    });
-
-    expect(result).toContain(
-      "search --query <string> [--limit <number>] [--verbose]",
-    );
-  });
-
-  it("shows enum values in type", () => {
-    const result = generateShellToolsPrompt({
-      setLevel: {
-        description: "Sets log level",
-        inputSchema: z.object({
-          level: z.enum(["debug", "info", "error"]),
-        }),
-        outputSchema: z.object({ success: z.boolean() }),
-        execute: async () => ({ success: true }),
-      },
-    });
-
-    expect(result).toContain("set-level --level <debug|info|error>");
-  });
-
-  it("shows optional fields in output description", () => {
-    const result = generateShellToolsPrompt({
-      getUser: {
-        description: "Gets a user",
-        inputSchema: z.object({ id: z.string() }),
-        outputSchema: z.object({
-          name: z.string(),
-          email: z.string(),
-          age: z.number().optional(),
-        }),
-        execute: async () => ({ name: "Alice", email: "alice@example.com" }),
-      },
-    });
-
-    expect(result).toContain("Output: JSON { name, email, age? }");
-  });
-
-  it("handles array output type", () => {
-    const result = generateShellToolsPrompt({
-      listUsers: {
-        description: "Lists all users",
-        inputSchema: z.object({}),
-        outputSchema: z.array(z.object({ name: z.string() })),
-        execute: async () => [{ name: "Alice" }],
-      },
-    });
-
-    expect(result).toContain("Output: JSON object[]");
+    expect(result).toContain("fetch-user - Fetches a user");
+    expect(result).toContain("send-email - Sends an email");
+    // Should NOT contain usage details
+    expect(result).not.toContain("--id <string>");
+    expect(result).not.toContain("--to <string>");
+    expect(result).not.toContain("Output:");
   });
 
   it("converts camelCase to kebab-case", () => {
@@ -134,8 +73,6 @@ describe("generateShellToolsPrompt", () => {
       },
     });
 
-    expect(result).toContain(
-      "get-user-by-id --user-id <string> [--include-metadata]",
-    );
+    expect(result).toContain("get-user-by-id - Gets user by ID");
   });
 });

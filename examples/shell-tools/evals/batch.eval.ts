@@ -27,7 +27,7 @@ import {
 
 const users: Record<
   string,
-  { name: string; email: string; balance: number; status: string }
+  { name: string; email: string; balance: number; status: "active" | "inactive" }
 > = {
   usr_1: {
     name: "Alice Johnson",
@@ -101,7 +101,7 @@ async function executeListUserIds({
   };
 }
 
-async function executeGetUser({ id }: z.infer<typeof getUserInputSchema>) {
+async function executeGetUser({ id }: z.infer<typeof getUserInputSchema>): Promise<z.infer<typeof getUserOutputSchema>> {
   const user = users[id];
   if (!user) {
     throw new Error(`User not found: ${id}`);
@@ -111,7 +111,7 @@ async function executeGetUser({ id }: z.infer<typeof getUserInputSchema>) {
     name: user.name,
     email: user.email,
     balance: user.balance,
-    status: user.status,
+    status: user.status as "active" | "inactive",
   };
 }
 
@@ -225,7 +225,14 @@ async function main() {
     runBaseline: runBaselineVersion,
     assertions: {
       // The prompt asks about active users and total balance
-      requiredResponseTerms: ["alice", "bob", "diana", "eve", "total", "balance"],
+      requiredResponseTerms: [
+        "alice",
+        "bob",
+        "diana",
+        "eve",
+        "total",
+        "balance",
+      ],
     },
     outputPath: "examples/shell-tools/evals/data/batch-output.json",
   });

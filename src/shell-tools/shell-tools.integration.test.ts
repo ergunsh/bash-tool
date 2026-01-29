@@ -329,15 +329,16 @@ describe("shell tools integration", () => {
         shellTools: { fetchUser },
       });
 
-      expect(tools.bash.description).toContain("CUSTOM SHELL TOOLS:");
-      expect(tools.bash.description).toContain("fetch-user --id <string>");
+      expect(tools.bash.description).toContain("Available shell tools:");
       expect(tools.bash.description).toContain(
-        "Fetches a user from the database",
+        "fetch-user - Fetches a user from the database",
       );
-      expect(tools.bash.description).toContain("Output: JSON { name, email }");
       expect(tools.bash.description).toContain(
-        "Run any tool with --help for detailed documentation.",
+        "Run <tool> --help before first use to see usage, flags, and output format.",
       );
+      // Progressive disclosure: no usage details in main prompt
+      expect(tools.bash.description).not.toContain("--id <string>");
+      expect(tools.bash.description).not.toContain("Output:");
     });
   });
 
