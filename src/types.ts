@@ -1,6 +1,6 @@
 import type { Sandbox as VercelSandbox } from "@vercel/sandbox";
+import type { CliToolsRecord } from "./cli-tools/types.js";
 import type { JustBashLike } from "./sandbox/just-bash.js";
-import type { ShellToolsRecord } from "./shell-tools/types.js";
 
 export interface CommandResult {
   stdout: string;
@@ -159,16 +159,16 @@ export interface CreateBashToolOptions {
   maxFiles?: number;
 
   /**
-   * Custom shell tools to register as bash commands.
+   * Custom CLI tools to register as bash commands.
    * Keys are tool names (camelCase, converted to kebab-case for CLI).
    * Only works with just-bash sandbox.
    *
    * @example
    * ```typescript
-   * import { experimental_createShellTool } from "bash-tool";
+   * import { experimental_createCliTool } from "bash-tool";
    * import { z } from "zod";
    *
-   * const fetchUser = experimental_createShellTool({
+   * const fetchUser = experimental_createCliTool({
    *   description: "Fetches a user from the database",
    *   inputSchema: z.object({ id: z.string() }),
    *   outputSchema: z.object({ name: z.string(), email: z.string() }),
@@ -176,11 +176,11 @@ export interface CreateBashToolOptions {
    * });
    *
    * const { tools } = await createBashTool({
-   *   shellTools: { fetchUser },
+   *   cliTools: { fetchUser },
    * });
    * ```
    */
-  shellTools?: ShellToolsRecord;
+  cliTools?: CliToolsRecord;
 }
 
 // Import actual tool creators for proper typing

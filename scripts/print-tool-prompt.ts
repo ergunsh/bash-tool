@@ -5,19 +5,19 @@
  * exactly as the AI model receives it.
  *
  * Usage:
- *   npx tsx scripts/print-tool-prompt.ts                 # without shell tools
- *   npx tsx scripts/print-tool-prompt.ts --shell-tools    # with shell tools
+ *   npx tsx scripts/print-tool-prompt.ts                 # without CLI tools
+ *   npx tsx scripts/print-tool-prompt.ts --cli-tools    # with CLI tools
  */
 
 import { z } from "zod";
 import {
   createBashTool,
-  experimental_createShellTool as createShellTool,
+  experimental_createCliTool as createCliTool,
 } from "../src/index.js";
 
-// ============ Sample Shell Tools ============
+// ============ Sample CLI Tools ============
 
-const fetchUser = createShellTool({
+const fetchUser = createCliTool({
   description: "Fetches a user by ID",
   inputSchema: z.object({
     id: z.string().describe("The user ID (e.g., usr_1)"),
@@ -35,7 +35,7 @@ const fetchUser = createShellTool({
   }),
 });
 
-const listUsers = createShellTool({
+const listUsers = createCliTool({
   description: "Lists all users in the database",
   inputSchema: z.object({
     limit: z.number().optional().default(10).describe("Maximum users to return"),
@@ -53,7 +53,7 @@ const listUsers = createShellTool({
   }),
 });
 
-const sendEmail = createShellTool({
+const sendEmail = createCliTool({
   description: "Sends an email to a recipient",
   inputSchema: z.object({
     to: z.string().describe("Recipient email address"),
@@ -70,18 +70,18 @@ const sendEmail = createShellTool({
 // ============ Main ============
 
 async function main() {
-  const useShellTools = process.argv.includes("--shell-tools");
+  const useCliTools = process.argv.includes("--cli-tools");
 
-  const shellTools = useShellTools
+  const cliTools = useCliTools
     ? { fetchUser, listUsers, sendEmail }
     : undefined;
 
   console.log(
-    useShellTools ? "Running WITH shell tools\n" : "Running WITHOUT shell tools\n",
+    useCliTools ? "Running WITH CLI tools\n" : "Running WITHOUT CLI tools\n",
   );
 
   const { tools } = await createBashTool({
-    shellTools,
+    cliTools,
   });
 
   for (const [name, t] of Object.entries(tools)) {

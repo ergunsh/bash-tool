@@ -1,4 +1,5 @@
 import path from "node:path";
+import { generateCliToolsPrompt, toCommands } from "./cli-tools/index.js";
 import { getFilePaths, streamFiles } from "./files/loader.js";
 import {
   createJustBashSandbox,
@@ -6,7 +7,6 @@ import {
   wrapJustBash,
 } from "./sandbox/just-bash.js";
 import { isVercelSandbox, wrapVercelSandbox } from "./sandbox/vercel.js";
-import { generateShellToolsPrompt, toCommands } from "./shell-tools/index.js";
 import { createBashExecuteTool } from "./tools/bash.js";
 import { createReadFileTool } from "./tools/read-file.js";
 import { createWriteFileTool } from "./tools/write-file.js";
@@ -54,9 +54,9 @@ export async function createBashTool(
       : DEFAULT_DESTINATION;
   const destination = options.destination ?? defaultDestination;
 
-  // Convert shell tools to just-bash commands
-  const customCommands = options.shellTools
-    ? toCommands(options.shellTools)
+  // Convert CLI tools to just-bash commands
+  const customCommands = options.cliTools
+    ? toCommands(options.cliTools)
     : undefined;
 
   // 3. Create or wrap sandbox
@@ -70,18 +70,18 @@ export async function createBashTool(
   let fileWrittenPromise: Promise<void> | undefined;
 
   if (options.sandbox) {
-    // Shell tools require just-bash - check if external sandbox is compatible
-    if (options.shellTools) {
+    // CLI tools require just-bash - check if external sandbox is compatible
+    if (options.cliTools) {
       if (isVercelSandbox(options.sandbox)) {
         throw new Error(
-          "Shell tools are only supported with just-bash sandbox. " +
-            "When using @vercel/sandbox, remove the shellTools option or use just-bash instead.",
+          "CLI tools are only supported with just-bash sandbox. " +
+            "When using @vercel/sandbox, remove the cliTools option or use just-bash instead.",
         );
       }
       if (!isJustBash(options.sandbox)) {
         throw new Error(
-          "Shell tools are only supported with just-bash sandbox. " +
-            "Provide a just-bash Bash instance or remove the shellTools option.",
+          "CLI tools are only supported with just-bash sandbox. " +
+            "Provide a just-bash Bash instance or remove the cliTools option.",
         );
       }
     }
@@ -211,14 +211,14 @@ export async function createBashTool(
     fileWrittenPromise,
   ]);
 
-  // 5. Generate shell tools prompt if shell tools are provided
-  const shellToolsPrompt = options.shellTools
-    ? generateShellToolsPrompt(options.shellTools)
+  // 5. Generate CLI tools prompt if CLI tools are provided
+  const cliToolsPrompt = options.cliTools
+    ? generateCliToolsPrompt(options.cliTools)
     : "";
 
   // Combine tool prompts
-  const combinedPrompt = shellToolsPrompt
-    ? `${toolPrompt}\n\n${shellToolsPrompt}`
+  const combinedPrompt = cliToolsPrompt
+    ? `${toolPrompt}\n\n${cliToolsPrompt}`
     : toolPrompt;
 
   // 6. Create tools

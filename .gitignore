@@ -33,4 +33,4 @@ todo/
 .env*.local
 
 # Eval outputs
-examples/shell-tools/evals/data/
+examples/cli-tools/evals/data/
