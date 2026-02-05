@@ -21,9 +21,7 @@ import {
   executeGetTeam,
   executeGetUser,
   getTeamInputSchema,
-  getTeamOutputSchema,
   getUserInputSchema,
-  getUserOutputSchema,
   prompt,
 } from "../composing/shared.js";
 import {
@@ -41,14 +39,12 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const getUser = createCliTool({
     description: descriptions.getUser,
     inputSchema: getUserInputSchema,
-    outputSchema: getUserOutputSchema,
     execute: executeGetUser,
   });
 
   const getTeam = createCliTool({
     description: descriptions.getTeam,
     inputSchema: getTeamInputSchema,
-    outputSchema: getTeamOutputSchema,
     execute: executeGetTeam,
   });
 

@@ -75,21 +75,8 @@ const listUserIdsInputSchema = z.object({
   status: statusEnum.optional().describe("Filter by user status"),
 });
 
-const listUserIdsOutputSchema = z.object({
-  userIds: z.array(userIdEnum),
-  total: z.number(),
-});
-
 const getUserInputSchema = z.object({
   id: userIdEnum.describe("The user ID"),
-});
-
-const getUserOutputSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string(),
-  balance: z.number(),
-  status: statusEnum,
 });
 
 // ============ Execute Functions ============
@@ -106,11 +93,7 @@ async function executeListUserIds({
   };
 }
 
-async function executeGetUser({
-  id,
-}: z.infer<typeof getUserInputSchema>): Promise<
-  z.infer<typeof getUserOutputSchema>
-> {
+async function executeGetUser({ id }: z.infer<typeof getUserInputSchema>) {
   const user = users[id];
   if (!user) {
     throw new Error(`User not found: ${id}`);
@@ -144,14 +127,12 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const listUserIds = createCliTool({
     description: descriptions.listUserIds,
     inputSchema: listUserIdsInputSchema,
-    outputSchema: listUserIdsOutputSchema,
     execute: executeListUserIds,
   });
 
   const getUser = createCliTool({
     description: descriptions.getUser,
     inputSchema: getUserInputSchema,
-    outputSchema: getUserOutputSchema,
     execute: executeGetUser,
   });
 

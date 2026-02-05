@@ -4,7 +4,7 @@ import type { CliToolDefinition } from "./types.js";
  * Creates a CLI tool definition with type inference.
  *
  * CLI tools are registered as CLI commands in the bash environment.
- * They use Zod schemas for input validation and output typing.
+ * They use Zod schemas for input validation. Output is saved to files.
  *
  * @example
  * ```typescript
@@ -14,13 +14,8 @@ import type { CliToolDefinition } from "./types.js";
  *     id: z.string().describe("The user ID"),
  *     includeMetadata: z.boolean().optional(),
  *   }),
- *   outputSchema: z.object({
- *     name: z.string(),
- *     email: z.string(),
- *     createdAt: z.string().optional(),
- *   }),
  *   execute: async ({ id, includeMetadata }) => {
- *     // Implementation
+ *     // Implementation - output saved to .cli-output/fetch-user-<timestamp>.json
  *     return { name: "Alice", email: "alice@example.com" };
  *   },
  * });
@@ -31,8 +26,8 @@ import type { CliToolDefinition } from "./types.js";
  * });
  * ```
  */
-export function experimental_createCliTool<TInput, TOutput>(
-  definition: CliToolDefinition<TInput, TOutput>,
-): CliToolDefinition<TInput, TOutput> {
+export function experimental_createCliTool<TInput>(
+  definition: CliToolDefinition<TInput>,
+): CliToolDefinition<TInput> {
   return definition;
 }

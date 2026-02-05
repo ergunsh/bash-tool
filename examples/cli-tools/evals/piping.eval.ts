@@ -17,9 +17,7 @@ import {
   executeGetOrder,
   executeListOrderIds,
   getOrderInputSchema,
-  getOrderOutputSchema,
   listOrderIdsInputSchema,
-  listOrderIdsOutputSchema,
   prompt,
 } from "../piping/shared.js";
 import {
@@ -37,14 +35,12 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const listOrderIds = createCliTool({
     description: descriptions.listOrderIds,
     inputSchema: listOrderIdsInputSchema,
-    outputSchema: listOrderIdsOutputSchema,
     execute: executeListOrderIds,
   });
 
   const getOrder = createCliTool({
     description: descriptions.getOrder,
     inputSchema: getOrderInputSchema,
-    outputSchema: getOrderOutputSchema,
     execute: executeGetOrder,
   });
 

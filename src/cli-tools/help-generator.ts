@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { getDescription, isOptional, toKebabCase } from "./cli-parser.js";
+import { CLI_OUTPUT_DIR } from "./types.js";
 
 /**
  * Get the type label for a Zod schema (for CLI help display).
@@ -115,80 +116,6 @@ function formatDefaultValue(value: unknown): string {
   return String(value);
 }
 
-/**
- * Generate a compact type signature for the output schema.
- */
-function generateOutputSignature(schema: z.ZodTypeAny, indent = 2): string {
-  const inner = getInnerType(schema);
-  const typeName = inner._def.typeName;
-
-  if (typeName === "ZodObject") {
-    const shape = getShape(schema);
-    if (!shape) return "object";
-
-    const lines: string[] = ["{"];
-    const entries = Object.entries(shape);
-
-    for (const [key, fieldSchema] of entries) {
-      const optional = isOptional(fieldSchema);
-      const desc = getDescription(fieldSchema);
-      const typeLabel = getOutputTypeLabel(fieldSchema);
-      const optMarker = optional ? "?" : "";
-
-      let line = `${" ".repeat(indent)}"${key}"${optMarker}: ${typeLabel}`;
-      if (desc) {
-        line += `,  // ${desc}`;
-      } else {
-        line += ",";
-      }
-      lines.push(line);
-    }
-
-    lines.push("}");
-    return lines.join("\n");
-  }
-
-  if (typeName === "ZodArray") {
-    const elementType = inner._def.type as z.ZodTypeAny;
-    return `${getOutputTypeLabel(elementType)}[]`;
-  }
-
-  return getOutputTypeLabel(schema);
-}
-
-/**
- * Get the type label for output schema (TypeScript-like syntax).
- */
-function getOutputTypeLabel(schema: z.ZodTypeAny): string {
-  const inner = getInnerType(schema);
-  const typeName = inner._def.typeName;
-
-  switch (typeName) {
-    case "ZodString":
-      return "string";
-    case "ZodNumber":
-      return "number";
-    case "ZodBoolean":
-      return "boolean";
-    case "ZodEnum": {
-      const values = inner._def.values as string[];
-      return values.map((v) => `"${v}"`).join(" | ");
-    }
-    case "ZodArray": {
-      const elementType = inner._def.type as z.ZodTypeAny;
-      return `${getOutputTypeLabel(elementType)}[]`;
-    }
-    case "ZodObject":
-      return "object";
-    case "ZodNull":
-      return "null";
-    case "ZodUndefined":
-      return "undefined";
-    default:
-      return "unknown";
-  }
-}
-
 export interface HelpGeneratorOptions {
   /** Command name (kebab-case) */
   name: string;
@@ -196,8 +123,6 @@ export interface HelpGeneratorOptions {
   description: string;
   /** Input schema */
   inputSchema: z.ZodTypeAny;
-  /** Output schema */
-  outputSchema: z.ZodTypeAny;
 }
 
 /**
@@ -214,16 +139,13 @@ export interface HelpGeneratorOptions {
  *   --id <string>           The user UUID (required)
  *   --include-metadata      Include timestamps (optional)
  *
- * OUTPUT (JSON):
- *   {
- *     "name": string,        // Full display name
- *     "email": string,       // Primary email address
- *     "createdAt"?: string   // ISO timestamp
- *   }
+ * OUTPUT:
+ *   Saved to .cli-output/<command>-<timestamp>.json
+ *   Read with: cat <path> | jq '.field'
  * ```
  */
 export function generateHelp(options: HelpGeneratorOptions): string {
-  const { name, description, inputSchema, outputSchema } = options;
+  const { name, description, inputSchema } = options;
 
   const shape = getShape(inputSchema);
   if (!shape) {
@@ -303,11 +225,9 @@ export function generateHelp(options: HelpGeneratorOptions): string {
   lines.push("");
 
   // OUTPUT section
-  lines.push("OUTPUT (JSON):");
-  const outputSig = generateOutputSignature(outputSchema);
-  for (const line of outputSig.split("\n")) {
-    lines.push(`  ${line}`);
-  }
+  lines.push("OUTPUT:");
+  lines.push(`  Saved to ${CLI_OUTPUT_DIR}/<command>-<timestamp>.json`);
+  lines.push("  Read with: cat <path> | jq '.field'");
 
   return lines.join("\n");
 }

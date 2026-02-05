@@ -12,9 +12,9 @@ const createMockContext = (): CommandContext =>
       writeFile: vi.fn(),
       stat: vi.fn(),
       readdir: vi.fn(),
-      mkdir: vi.fn(),
+      mkdir: vi.fn().mockResolvedValue(undefined),
       rm: vi.fn(),
-      exists: vi.fn(),
+      exists: vi.fn().mockResolvedValue(false),
     },
     cwd: "/workspace",
     env: {},
@@ -31,10 +31,9 @@ describe("toKebabCase", () => {
 
 describe("toCommand", () => {
   it("creates a command with kebab-case name", () => {
-    const definition: CliToolDefinition<{ id: string }, { name: string }> = {
+    const definition: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user",
       inputSchema: z.object({ id: z.string() }),
-      outputSchema: z.object({ name: z.string() }),
       execute: async ({ id }) => ({ name: `User ${id}` }),
     };
 
@@ -42,11 +41,10 @@ describe("toCommand", () => {
     expect(command.name).toBe("fetch-user");
   });
 
-  it("executes with valid args and returns JSON", async () => {
-    const definition: CliToolDefinition<{ id: string }, { name: string }> = {
+  it("executes with valid args and saves output to file", async () => {
+    const definition: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user",
       inputSchema: z.object({ id: z.string() }),
-      outputSchema: z.object({ name: z.string() }),
       execute: async ({ id }) => ({ name: `User ${id}` }),
     };
 
@@ -56,14 +54,50 @@ describe("toCommand", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
-    expect(JSON.parse(result.stdout)).toEqual({ name: "User usr_123" });
+    expect(result.stdout).toContain("Output saved to");
+    expect(result.stdout).toContain(".cli-output/fetch-user-");
+    expect(result.stdout).toContain(".json");
+    expect(ctx.fs.writeFile).toHaveBeenCalled();
+  });
+
+  it("creates output directory if it does not exist", async () => {
+    const definition: CliToolDefinition<{ id: string }> = {
+      description: "Fetches a user",
+      inputSchema: z.object({ id: z.string() }),
+      execute: async ({ id }) => ({ name: `User ${id}` }),
+    };
+
+    const command = toCommand("fetchUser", definition);
+    const ctx = createMockContext();
+    (ctx.fs.exists as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+
+    await command.execute(["--id", "usr_123"], ctx);
+
+    expect(ctx.fs.mkdir).toHaveBeenCalledWith("/workspace/.cli-output", {
+      recursive: true,
+    });
+  });
+
+  it("does not create output directory if it already exists", async () => {
+    const definition: CliToolDefinition<{ id: string }> = {
+      description: "Fetches a user",
+      inputSchema: z.object({ id: z.string() }),
+      execute: async ({ id }) => ({ name: `User ${id}` }),
+    };
+
+    const command = toCommand("fetchUser", definition);
+    const ctx = createMockContext();
+    (ctx.fs.exists as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+    await command.execute(["--id", "usr_123"], ctx);
+
+    expect(ctx.fs.mkdir).not.toHaveBeenCalled();
   });
 
   it("shows help on --help flag", async () => {
-    const definition: CliToolDefinition<{ id: string }, { name: string }> = {
+    const definition: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user from the database",
       inputSchema: z.object({ id: z.string().describe("The user ID") }),
-      outputSchema: z.object({ name: z.string() }),
       execute: async ({ id }) => ({ name: `User ${id}` }),
     };
 
@@ -79,10 +113,9 @@ describe("toCommand", () => {
   });
 
   it("shows help on -h flag", async () => {
-    const definition: CliToolDefinition<{ id: string }, { name: string }> = {
+    const definition: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user",
       inputSchema: z.object({ id: z.string() }),
-      outputSchema: z.object({ name: z.string() }),
       execute: async ({ id }) => ({ name: `User ${id}` }),
     };
 
@@ -95,10 +128,9 @@ describe("toCommand", () => {
   });
 
   it("returns error with help on validation failure", async () => {
-    const definition: CliToolDefinition<{ id: string }, { name: string }> = {
+    const definition: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user",
       inputSchema: z.object({ id: z.string() }),
-      outputSchema: z.object({ name: z.string() }),
       execute: async ({ id }) => ({ name: `User ${id}` }),
     };
 
@@ -113,10 +145,9 @@ describe("toCommand", () => {
   });
 
   it("returns error on unknown flag", async () => {
-    const definition: CliToolDefinition<{ id: string }, { name: string }> = {
+    const definition: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user",
       inputSchema: z.object({ id: z.string() }),
-      outputSchema: z.object({ name: z.string() }),
       execute: async ({ id }) => ({ name: `User ${id}` }),
     };
 
@@ -129,10 +160,9 @@ describe("toCommand", () => {
   });
 
   it("handles execute function errors", async () => {
-    const definition: CliToolDefinition<{ id: string }, { name: string }> = {
+    const definition: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user",
       inputSchema: z.object({ id: z.string() }),
-      outputSchema: z.object({ name: z.string() }),
       execute: async () => {
         throw new Error("User not found");
       },
@@ -149,13 +179,11 @@ describe("toCommand", () => {
   it("passes context to execute function", async () => {
     const executeFn = vi.fn().mockResolvedValue({ success: true });
 
-    const definition: CliToolDefinition<{ id: string }, { success: boolean }> =
-      {
-        description: "Test tool",
-        inputSchema: z.object({ id: z.string() }),
-        outputSchema: z.object({ success: z.boolean() }),
-        execute: executeFn,
-      };
+    const definition: CliToolDefinition<{ id: string }> = {
+      description: "Test tool",
+      inputSchema: z.object({ id: z.string() }),
+      execute: executeFn,
+    };
 
     const command = toCommand("testTool", definition);
     const ctx = createMockContext();
@@ -188,7 +216,6 @@ describe("toCommand", () => {
     const definition = {
       description: "Complex tool",
       inputSchema,
-      outputSchema: z.object({ result: z.string() }),
       execute: async (input: ComplexInput) => ({
         result: `${input.id}-${input.count}-${input.verbose}-${input.tags.join(",")}`,
       }),
@@ -197,7 +224,7 @@ describe("toCommand", () => {
     const command = toCommand("complexTool", definition);
     const ctx = createMockContext();
 
-    // With all args
+    // With all args - verify output saved message
     const result1 = await command.execute(
       [
         "--id",
@@ -213,23 +240,21 @@ describe("toCommand", () => {
       ctx,
     );
     expect(result1.exitCode).toBe(0);
-    expect(JSON.parse(result1.stdout)).toEqual({
-      result: "test-5-true-a,b",
-    });
+    expect(result1.stdout).toContain("Output saved to");
+    expect(ctx.fs.writeFile).toHaveBeenCalled();
 
-    // With defaults
-    const result2 = await command.execute(["--id", "test"], ctx);
-    expect(result2.exitCode).toBe(0);
-    expect(JSON.parse(result2.stdout)).toEqual({
-      result: "test-10-false-",
+    // Verify JSON written to file
+    const writeCall = (ctx.fs.writeFile as ReturnType<typeof vi.fn>).mock
+      .calls[0];
+    expect(JSON.parse(writeCall[1])).toEqual({
+      result: "test-5-true-a,b",
     });
   });
 
   it("handles synchronous execute function", async () => {
-    const definition: CliToolDefinition<{ id: string }, { name: string }> = {
+    const definition: CliToolDefinition<{ id: string }> = {
       description: "Sync tool",
       inputSchema: z.object({ id: z.string() }),
-      outputSchema: z.object({ name: z.string() }),
       execute: ({ id }) => ({ name: `User ${id}` }), // Sync
     };
 
@@ -238,29 +263,24 @@ describe("toCommand", () => {
     const result = await command.execute(["--id", "123"], ctx);
 
     expect(result.exitCode).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual({ name: "User 123" });
+    expect(result.stdout).toContain("Output saved to");
   });
 });
 
 describe("toCommands", () => {
   it("converts record of definitions to array of commands", () => {
-    const fetchUser: CliToolDefinition<{ id: string }, { name: string }> = {
+    const fetchUser: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user",
       inputSchema: z.object({ id: z.string() }),
-      outputSchema: z.object({ name: z.string() }),
       execute: async ({ id }) => ({ name: `User ${id}` }),
     };
 
-    const sendEmail: CliToolDefinition<
-      { to: string; subject: string },
-      { sent: boolean }
-    > = {
+    const sendEmail: CliToolDefinition<{ to: string; subject: string }> = {
       description: "Sends an email",
       inputSchema: z.object({
         to: z.string(),
         subject: z.string(),
       }),
-      outputSchema: z.object({ sent: z.boolean() }),
       execute: async () => ({ sent: true }),
     };
 

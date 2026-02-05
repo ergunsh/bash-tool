@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { isOptional, toKebabCase } from "./cli-parser.js";
-import type { CliToolDefinition } from "./types.js";
+import { CLI_OUTPUT_DIR, type CliToolDefinition } from "./types.js";
 
 /**
  * Get the inner type name, unwrapping optional/default wrappers.
@@ -103,7 +103,7 @@ function generateUsageSignature(
  * Generate LLM prompt section for CLI tools.
  *
  * Shows usage signatures upfront so the agent can use tools immediately
- * without needing to call --help first. Emphasizes chaining to save round-trips.
+ * without needing to call --help first. Outputs are saved to files.
  */
 export function generateCliToolsPrompt(
   cliTools: Record<string, CliToolDefinition>,
@@ -114,7 +114,7 @@ export function generateCliToolsPrompt(
     return "";
   }
 
-  const lines: string[] = ["CLI TOOLS:"];
+  const lines: string[] = ["CLI TOOLS (outputs saved to files):"];
 
   for (const name of toolNames) {
     const kebabName = toKebabCase(name);
@@ -123,14 +123,10 @@ export function generateCliToolsPrompt(
     lines.push(`  ${usage}`);
   }
 
-  // Add multi-line script example to encourage scripting
-  if (toolNames.length >= 2) {
-    lines.push("");
-    lines.push("CHAIN in ONE bash call:");
-    lines.push("  result=$(cmd-a --id x)");
-    lines.push("  field=$(echo \"$result\" | jq -r '.fieldName')");
-    lines.push('  cmd-b --arg "$field"');
-  }
+  lines.push("");
+  lines.push(`Output files saved to: ${CLI_OUTPUT_DIR}/`);
+  lines.push("Read output: cat <path> | jq '.field'");
+  lines.push("Search: grep 'pattern' <path>");
 
   return lines.join("\n");
 }

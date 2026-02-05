@@ -8,24 +8,24 @@ describe("generateCliToolsPrompt", () => {
     expect(result).toBe("");
   });
 
-  it("generates prompt with usage signature and description", () => {
+  it("generates prompt with usage signature and file-based output", () => {
     const result = generateCliToolsPrompt({
       fetchUser: {
         description: "Fetches a user from the database",
         inputSchema: z.object({
           id: z.string().describe("The user ID"),
         }),
-        outputSchema: z.object({
-          name: z.string(),
-          email: z.string(),
-        }),
         execute: async () => ({ name: "Alice", email: "alice@example.com" }),
       },
     });
 
-    expect(result).toContain("CLI TOOLS:");
+    expect(result).toContain("CLI TOOLS (outputs saved to files):");
     // Shows usage signature with flags upfront (no --help needed)
     expect(result).toContain("fetch-user --id <string>");
+    // Shows file-based output instructions
+    expect(result).toContain("Output files saved to: .cli-output/");
+    expect(result).toContain("Read output: cat <path> | jq");
+    expect(result).toContain("Search: grep 'pattern' <path>");
     // Should NOT require --help (new strategy)
     expect(result).not.toContain("MUST run <tool> --help");
   });
@@ -35,7 +35,6 @@ describe("generateCliToolsPrompt", () => {
       fetchUser: {
         description: "Fetches a user",
         inputSchema: z.object({ id: z.string() }),
-        outputSchema: z.object({ name: z.string() }),
         execute: async () => ({ name: "Alice" }),
       },
       sendEmail: {
@@ -44,7 +43,6 @@ describe("generateCliToolsPrompt", () => {
           to: z.string(),
           subject: z.string(),
         }),
-        outputSchema: z.object({ sent: z.boolean() }),
         execute: async () => ({ sent: true }),
       },
     });
@@ -62,7 +60,6 @@ describe("generateCliToolsPrompt", () => {
           userId: z.string(),
           includeMetadata: z.boolean().optional(),
         }),
-        outputSchema: z.object({ userName: z.string() }),
         execute: async () => ({ userName: "Alice" }),
       },
     });

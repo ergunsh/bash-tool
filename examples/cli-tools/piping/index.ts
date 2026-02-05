@@ -18,9 +18,7 @@ import {
   executeGetOrder,
   executeListOrderIds,
   getOrderInputSchema,
-  getOrderOutputSchema,
   listOrderIdsInputSchema,
-  listOrderIdsOutputSchema,
   prompt,
 } from "./shared.js";
 
@@ -28,14 +26,12 @@ import {
 const listOrderIds = createCliTool({
   description: descriptions.listOrderIds,
   inputSchema: listOrderIdsInputSchema,
-  outputSchema: listOrderIdsOutputSchema,
   execute: executeListOrderIds,
 });
 
 const getOrder = createCliTool({
   description: descriptions.getOrder,
   inputSchema: getOrderInputSchema,
-  outputSchema: getOrderOutputSchema,
   execute: executeGetOrder,
 });
 

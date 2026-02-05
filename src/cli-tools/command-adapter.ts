@@ -1,7 +1,11 @@
 import type { Command, ExecResult } from "just-bash";
 import { parseCliArgs, toKebabCase } from "./cli-parser.js";
 import { generateHelp } from "./help-generator.js";
-import type { CliToolDefinition, CliToolsRecord } from "./types.js";
+import {
+  CLI_OUTPUT_DIR,
+  type CliToolDefinition,
+  type CliToolsRecord,
+} from "./types.js";
 
 export { toKebabCase };
 
@@ -12,18 +16,18 @@ export { toKebabCase };
  * - Uses kebab-case naming (camelCase to kebab-case conversion)
  * - Handles `--help` flag to show documentation
  * - Parses and validates CLI args against the input schema
- * - Executes the tool and returns JSON output
+ * - Executes the tool and saves output to file
  * - Returns error + help on validation failure
  *
  * @param name - The tool name (camelCase, from object key)
  * @param definition - The CLI tool definition
  */
-export function toCommand<TInput, TOutput>(
+export function toCommand<TInput>(
   name: string,
-  definition: CliToolDefinition<TInput, TOutput>,
+  definition: CliToolDefinition<TInput>,
 ): Command {
   const kebabName = toKebabCase(name);
-  const { description, inputSchema, outputSchema, execute } = definition;
+  const { description, inputSchema, execute } = definition;
 
   return {
     name: kebabName,
@@ -34,7 +38,6 @@ export function toCommand<TInput, TOutput>(
           name: kebabName,
           description,
           inputSchema,
-          outputSchema,
         });
         return {
           stdout: `${helpText}\n`,
@@ -51,7 +54,6 @@ export function toCommand<TInput, TOutput>(
           name: kebabName,
           description,
           inputSchema,
-          outputSchema,
         });
         return {
           stdout: "",
@@ -65,8 +67,17 @@ export function toCommand<TInput, TOutput>(
         // Cast is safe because parseCliArgs validates against inputSchema
         const result = await execute(parseResult.data as TInput, ctx);
         const jsonOutput = JSON.stringify(result, null, 2);
+
+        // Save output to file
+        const outputDir = `${ctx.cwd}/${CLI_OUTPUT_DIR}`;
+        if (!(await ctx.fs.exists(outputDir))) {
+          await ctx.fs.mkdir(outputDir, { recursive: true });
+        }
+        const outputPath = `${outputDir}/${kebabName}-${Date.now()}.json`;
+        await ctx.fs.writeFile(outputPath, jsonOutput);
+
         return {
-          stdout: `${jsonOutput}\n`,
+          stdout: `Output saved to ${outputPath}\n`,
           stderr: "",
           exitCode: 0,
         };

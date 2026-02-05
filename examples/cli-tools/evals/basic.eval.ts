@@ -50,35 +50,14 @@ const fetchUserInputSchema = z.object({
   includeMetadata: z.boolean().optional().describe("Include creation date"),
 });
 
-const fetchUserOutputSchema = z.object({
-  name: z.string().describe("Full display name"),
-  email: z.string().describe("Primary email address"),
-  createdAt: z.string().optional().describe("ISO date string"),
-});
-
 const listUsersInputSchema = z.object({
   limit: z.number().optional().default(10).describe("Maximum users to return"),
-});
-
-const listUsersOutputSchema = z.object({
-  users: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-    }),
-  ),
-  total: z.number(),
 });
 
 const sendEmailInputSchema = z.object({
   to: z.string().describe("Recipient email address"),
   subject: z.string().describe("Email subject line"),
   body: z.string().optional().describe("Email body content"),
-});
-
-const sendEmailOutputSchema = z.object({
-  sent: z.boolean(),
-  messageId: z.string(),
 });
 
 // ============ Execute Functions ============
@@ -141,21 +120,18 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const fetchUser = createCliTool({
     description: descriptions.fetchUser,
     inputSchema: fetchUserInputSchema,
-    outputSchema: fetchUserOutputSchema,
     execute: executeFetchUser,
   });
 
   const listUsers = createCliTool({
     description: descriptions.listUsers,
     inputSchema: listUsersInputSchema,
-    outputSchema: listUsersOutputSchema,
     execute: executeListUsers,
   });
 
   const sendEmail = createCliTool({
     description: descriptions.sendEmail,
     inputSchema: sendEmailInputSchema,
-    outputSchema: sendEmailOutputSchema,
     execute: executeSendEmail,
   });
 

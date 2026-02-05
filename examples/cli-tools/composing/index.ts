@@ -21,23 +21,19 @@ import {
   executeGetTeam,
   executeGetUser,
   getTeamInputSchema,
-  getTeamOutputSchema,
   getUserInputSchema,
-  getUserOutputSchema,
   prompt,
 } from "./shared.js";
 
 const getUser = createCliTool({
   description: descriptions.getUser,
   inputSchema: getUserInputSchema,
-  outputSchema: getUserOutputSchema,
   execute: executeGetUser,
 });
 
 const getTeam = createCliTool({
   description: descriptions.getTeam,
   inputSchema: getTeamInputSchema,
-  outputSchema: getTeamOutputSchema,
   execute: executeGetTeam,
 });
 

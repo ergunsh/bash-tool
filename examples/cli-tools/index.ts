@@ -45,19 +45,13 @@ const users: Record<
  * CLI Usage:
  *   fetch-user --id usr_1 [--include-metadata]
  *
- * Output:
- *   { "name": "...", "email": "...", "createdAt"?: "..." }
+ * Output saved to: .cli-output/fetch-user-<timestamp>.json
  */
 const fetchUser = createCliTool({
   description: "Fetches a user from the mock database",
   inputSchema: z.object({
     id: z.string().describe("The user ID (e.g., usr_1)"),
     includeMetadata: z.boolean().optional().describe("Include creation date"),
-  }),
-  outputSchema: z.object({
-    name: z.string().describe("Full display name"),
-    email: z.string().describe("Primary email address"),
-    createdAt: z.string().optional().describe("ISO date string"),
   }),
   execute: async ({ id, includeMetadata }) => {
     const user = users[id];
@@ -78,8 +72,7 @@ const fetchUser = createCliTool({
  * CLI Usage:
  *   list-users [--limit 10]
  *
- * Output:
- *   { "users": [{ "id": "...", "name": "..." }, ...], "total": 3 }
+ * Output saved to: .cli-output/list-users-<timestamp>.json
  */
 const listUsers = createCliTool({
   description: "Lists all users in the database",
@@ -89,15 +82,6 @@ const listUsers = createCliTool({
       .optional()
       .default(10)
       .describe("Maximum users to return"),
-  }),
-  outputSchema: z.object({
-    users: z.array(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-      }),
-    ),
-    total: z.number(),
   }),
   execute: async ({ limit }) => {
     const allUsers = Object.entries(users).map(([id, user]) => ({
@@ -117,8 +101,7 @@ const listUsers = createCliTool({
  * CLI Usage:
  *   send-email --to bob@example.com --subject "Hello" [--body "..."]
  *
- * Output:
- *   { "sent": true, "messageId": "..." }
+ * Output saved to: .cli-output/send-email-<timestamp>.json
  */
 const sendEmail = createCliTool({
   description: "Sends an email to a recipient",
@@ -126,10 +109,6 @@ const sendEmail = createCliTool({
     to: z.string().describe("Recipient email address"),
     subject: z.string().describe("Email subject line"),
     body: z.string().optional().describe("Email body content"),
-  }),
-  outputSchema: z.object({
-    sent: z.boolean(),
-    messageId: z.string(),
   }),
   execute: async ({ to, subject }) => {
     // Mock implementation - just return success

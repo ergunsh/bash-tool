@@ -31,36 +31,21 @@ import {
   executeListTasks,
   executeSearchCustomers,
   getContactInputSchema,
-  getContactOutputSchema,
   getCustomerInputSchema,
-  getCustomerOutputSchema,
   getDealInputSchema,
-  getDealOutputSchema,
   getInvoiceInputSchema,
-  getInvoiceOutputSchema,
   getProductInputSchema,
-  getProductOutputSchema,
   getTaskInputSchema,
-  getTaskOutputSchema,
   listActivitiesInputSchema,
-  listActivitiesOutputSchema,
   listContactsInputSchema,
-  listContactsOutputSchema,
   listCustomersInputSchema,
-  listCustomersOutputSchema,
   listDealsInputSchema,
-  listDealsOutputSchema,
   listInvoicesInputSchema,
-  listInvoicesOutputSchema,
   listNotesInputSchema,
-  listNotesOutputSchema,
   listProductsInputSchema,
-  listProductsOutputSchema,
   listTasksInputSchema,
-  listTasksOutputSchema,
   prompt,
   searchCustomersInputSchema,
-  searchCustomersOutputSchema,
 } from "../many-tools/shared.js";
 import {
   createStepHandler,
@@ -78,21 +63,18 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const getCustomer = createCliTool({
     description: descriptions.getCustomer,
     inputSchema: getCustomerInputSchema,
-    outputSchema: getCustomerOutputSchema,
     execute: executeGetCustomer,
   });
 
   const listCustomers = createCliTool({
     description: descriptions.listCustomers,
     inputSchema: listCustomersInputSchema,
-    outputSchema: listCustomersOutputSchema,
     execute: executeListCustomers,
   });
 
   const searchCustomers = createCliTool({
     description: descriptions.searchCustomers,
     inputSchema: searchCustomersInputSchema,
-    outputSchema: searchCustomersOutputSchema,
     execute: executeSearchCustomers,
   });
 
@@ -100,14 +82,12 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const getContact = createCliTool({
     description: descriptions.getContact,
     inputSchema: getContactInputSchema,
-    outputSchema: getContactOutputSchema,
     execute: executeGetContact,
   });
 
   const listContacts = createCliTool({
     description: descriptions.listContacts,
     inputSchema: listContactsInputSchema,
-    outputSchema: listContactsOutputSchema,
     execute: executeListContacts,
   });
 
@@ -115,14 +95,12 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const getDeal = createCliTool({
     description: descriptions.getDeal,
     inputSchema: getDealInputSchema,
-    outputSchema: getDealOutputSchema,
     execute: executeGetDeal,
   });
 
   const listDeals = createCliTool({
     description: descriptions.listDeals,
     inputSchema: listDealsInputSchema,
-    outputSchema: listDealsOutputSchema,
     execute: executeListDeals,
   });
 
@@ -130,14 +108,12 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const getTask = createCliTool({
     description: descriptions.getTask,
     inputSchema: getTaskInputSchema,
-    outputSchema: getTaskOutputSchema,
     execute: executeGetTask,
   });
 
   const listTasks = createCliTool({
     description: descriptions.listTasks,
     inputSchema: listTasksInputSchema,
-    outputSchema: listTasksOutputSchema,
     execute: executeListTasks,
   });
 
@@ -145,7 +121,6 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const listNotes = createCliTool({
     description: descriptions.listNotes,
     inputSchema: listNotesInputSchema,
-    outputSchema: listNotesOutputSchema,
     execute: executeListNotes,
   });
 
@@ -153,7 +128,6 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const listActivities = createCliTool({
     description: descriptions.listActivities,
     inputSchema: listActivitiesInputSchema,
-    outputSchema: listActivitiesOutputSchema,
     execute: executeListActivities,
   });
 
@@ -161,14 +135,12 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const getInvoice = createCliTool({
     description: descriptions.getInvoice,
     inputSchema: getInvoiceInputSchema,
-    outputSchema: getInvoiceOutputSchema,
     execute: executeGetInvoice,
   });
 
   const listInvoices = createCliTool({
     description: descriptions.listInvoices,
     inputSchema: listInvoicesInputSchema,
-    outputSchema: listInvoicesOutputSchema,
     execute: executeListInvoices,
   });
 
@@ -176,14 +148,12 @@ async function runCliToolsVersion(): Promise<RunResult> {
   const getProduct = createCliTool({
     description: descriptions.getProduct,
     inputSchema: getProductInputSchema,
-    outputSchema: getProductOutputSchema,
     execute: executeGetProduct,
   });
 
   const listProducts = createCliTool({
     description: descriptions.listProducts,
     inputSchema: listProductsInputSchema,
-    outputSchema: listProductsOutputSchema,
     execute: executeListProducts,
   });
 
