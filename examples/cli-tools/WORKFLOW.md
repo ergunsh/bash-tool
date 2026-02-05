@@ -8,8 +8,14 @@ Make CLI tools use **fewer tokens** than the baseline (native AI SDK tools) for 
 
 ## Success Criteria
 
-- **Done**: All 5 evals pass the `fewerTokens` assertion
+- **Done**: All 6 evals pass the `fewerTokens` assertion
 - **Stretch goal**: Each eval uses at least 10% fewer tokens than baseline (provides safety margin against LLM variance)
+
+## Current Status
+
+**2 of 6 evals passing:**
+- ✅ **large-data**: 1278 tokens vs 6036 baseline (4.7x fewer)
+- ✅ **many-tools**: 2051 tokens vs 2523 baseline (19% fewer)
 
 The baseline gives the LLM separate tools with typed schemas. CLI tools gives the LLM a single `bash` tool with custom CLI commands.
 
@@ -142,35 +148,43 @@ git commit -m "Strategy A: add usage signatures - basic/composing pass"
 
 ## Eval Scenarios
 
+### large-data ✅ (3 tools, PASSING)
+- **Prompt**: "Find the highest-rated electronics product that costs less than $350."
+- **Baseline**: 1 call, 6036 tokens (entire filtered dataset returned to LLM)
+- **CLI tools**: 2 calls, 1278 tokens (jq extracts just the answer)
+- **Why CLI tools wins**: Large dataset (500 products) saved to file. Structure hint enables correct jq query on first try. Only the final answer (3 fields) returns to LLM.
+- **Status**: PASSING - demonstrates the power of jq filtering for large data.
+
 ### many-tools ✅ (15 tools, PASSING)
 - **Prompt**: "Give me a summary of Acme Corp - their contacts, open deals, and recent activities."
-- **Baseline**: 5 calls, 3 steps across 15 available tools
-- **Why CLI tools wins**: 15 tool schemas in baseline is huge (~2500 tokens). CLI tools' compact listing is much smaller.
-- **Status**: PASSING - this is the showcase eval for CLI tools' prompt efficiency advantage.
+- **Baseline**: 5 calls, 2523 tokens across 15 available tools
+- **CLI tools**: 5 calls, 2051 tokens
+- **Why CLI tools wins**: 15 tool schemas in baseline is huge. CLI tools' compact listing is much smaller.
+- **Status**: PASSING - demonstrates prompt efficiency with many tools.
 
 ### basic ❌ (2 tools, currently failing)
 - **Prompt**: "Send a welcome email to usr_1 using their actual email from the database."
-- **Baseline**: 2 calls, 3 steps (fetchUser, sendEmail)
-- **Current issue**: CLI tools has ~60 tokens more overhead per step than baseline's 2 small tool schemas. Same step count means baseline wins.
-- **Needs redesign**: Pattern C (Aggregation) or Pattern A (Large Data) to create a scenario where CLI tools' filtering/computation saves tokens.
+- **Baseline**: 2 calls, 1223 tokens
+- **CLI tools**: 2 calls, 1289 tokens (5% overhead)
+- **Current issue**: With inline outputs, call count is now equal. But CLI tools has ~60 tokens more overhead per step due to bash tool description.
 
 ### composing ❌ (2 tools, currently failing)
 - **Prompt**: "Get the full details for user 'alice', including their team's name and department."
-- **Baseline**: 2 calls, 3 steps (getUser, getTeam)
-- **Current issue**: Same as basic - 2 tools means baseline has lower overhead, same steps means baseline wins.
-- **Needs redesign**: Pattern B (Deep Chain) - add a 3rd level of dependency that can't be parallelized.
+- **Baseline**: 2 calls, 1045 tokens
+- **CLI tools**: 2 calls, 1283 tokens (23% overhead)
+- **Current issue**: Same as basic - 2 tools means baseline has lower overhead.
 
 ### piping ❌ (2 tools, currently failing)
 - **Prompt**: "What's the total amount spent by customer cust_1?"
-- **Baseline**: 4 calls, 3 steps (listOrderIds + 3x getOrder in parallel)
-- **Current issue**: Baseline parallelizes the getOrder calls. CLI tools makes sequential calls.
-- **Needs redesign**: Pattern A (Large Data) - make the tool return LARGE payloads so jq filtering saves tokens.
+- **Baseline**: 4 calls, 1331 tokens
+- **CLI tools**: 4 calls, 1640 tokens (23% overhead)
+- **Current issue**: Both make same number of calls. Baseline has lower per-step overhead.
 
 ### batch ❌ (2 tools, currently failing)
 - **Prompt**: "Get the total account balance for all active users."
-- **Baseline**: 5 calls, 3 steps (listUserIds + 4x getUser in parallel)
-- **Current issue**: Same as piping - baseline parallelizes, CLI tools is sequential.
-- **Needs redesign**: Pattern A (Large Data) + Pattern C (Aggregation)
+- **Baseline**: 5 calls, 1376 tokens
+- **CLI tools**: 7 calls, 1983 tokens (44% overhead)
+- **Current issue**: CLI tools makes more calls and has higher per-step overhead.
 
 ## The Core Tradeoff
 
@@ -225,52 +239,63 @@ Avoid evals with:
 - 2-3 tools with simple queries - baseline has lower overhead
 - Scenarios where LLM scripting is optional - LLM prefers simple calls
 
+## Strategies Implemented
+
+### ✅ Strategy G: Inline Small Outputs (IMPLEMENTED)
+Small outputs (≤2000 chars) return inline instead of saving to files. This eliminated the need for a separate `cat` call, reducing call count by 50%.
+
+**Before:** `fetch-user --id x` → "Output saved to file" → `cat file` → data
+**After:** `fetch-user --id x` → data (inline)
+
+### ✅ Strategy H: Structure Hints for Large Outputs (IMPLEMENTED)
+When large outputs are saved to files, include a structure hint:
+```
+Output saved to /workspace/.cli-output/list-products-123.json
+Structure: {products: array[55], total: number}
+```
+
+This enables correct jq queries on the first try without exploring the file.
+
 ## Strategies to Explore
 
 ### Prioritization Guide
 
-1. **For few-tool evals failing** (basic, composing, piping, batch): Try Strategy A first (show signatures upfront)
-2. **For many-tool evals failing** (many-tools): Strategy B (progressive disclosure) likely already works
-3. **If agent makes sequential calls instead of scripting**: Try Strategy D (emphasize scripting)
-4. **If both few-tool and many-tool evals need different approaches**: Try Strategy C (hybrid)
-5. **For marginal improvements**: Try Strategy E (reduce bash description overhead)
+1. **For few-tool evals failing** (basic, composing, piping, batch): The remaining overhead is fundamental - bash tool description is larger than 2-3 small tool schemas
+2. **For large-data scenarios**: Strategy H (structure hints) already works well
+3. **For many-tool scenarios**: Compact listing already wins
 
-### Handling Tradeoffs
+### Remaining Options
 
-If a change improves some evals but regresses others:
-1. Analyze WHY each behaves differently (tool count? scripting behavior?)
-2. Consider Strategy C (hybrid based on tool count)
-3. If no hybrid works, prioritize the eval with tightest margin (usually `composing`)
-
-### Strategy A: Show usage signatures upfront (no `--help` needed)
-Show `tool --flag <type>` in the prompt so the agent never needs to call `--help`. Prevents wasted round-trips from syntax errors and `--help` lookups. Increases prompt size slightly but saves round-trips. Previously tried with output schemas included — was too verbose. Try with ONLY usage signatures (no output info).
-
-### Strategy B: Progressive disclosure (current approach)
-Show only tool names + descriptions, require `--help` before first use. Saves prompt tokens per round-trip but costs `--help` round-trips (each costing ~500-1000 tokens). Works well for many-tools, poorly for few-tool scenarios.
-
-### Strategy C: Hybrid based on tool count
-Show full signatures when there are few tools (< 5), use progressive disclosure when there are many (5+). More complex but could optimize for both cases.
-
-### Strategy D: Emphasize scripting over individual calls
-Instead of listing tools and hoping the agent scripts, explicitly frame the prompt to prime scripting behavior. E.g., "Always combine multiple operations in a single bash call."
+### Strategy A: Show usage signatures upfront (CURRENT)
+Usage signatures are shown in the prompt so the agent doesn't need `--help`. This is already implemented.
 
 ### Strategy E: Reduce bash tool description overhead
 Remove or condense the "Common operations" section when CLI tools are present. Every token saved in the base description compounds across all round-trips.
 
-### Strategy F: Smarter `--help` output
-Make `--help` output more compact so it costs fewer tokens when the agent does call it. Or include only the most essential information (just usage line + flags, skip the verbose output schema).
+### Strategy D: Emphasize scripting over individual calls
+For batch/piping scenarios, could add more aggressive prompting to encourage for-loops and jq pipelines. However, testing shows the model often prefers separate calls.
+
+### Fundamental Limitation
+
+For 2-3 tool scenarios with small data, native AI SDK tools will likely always be more efficient because:
+1. Their tool schemas are smaller than the bash tool description
+2. Same number of calls means baseline wins on tokens
+
+CLI tools' advantage is in:
+1. **Large datasets** - jq can filter data before returning to LLM
+2. **Many tools** - compact listing beats many separate schemas
 
 ## Creating New Evals
 
 If you identify a scenario where CLI tools should clearly win on tokens, create a new eval. Good candidates:
 
-1. **Large fan-out**: Get a list of IDs, then fetch details for each (10+ items). Baseline needs many round-trips (each resending full prompt), CLI tools can do it in 2 calls with a for-loop.
+1. **Large dataset filtering** (see `large-data.eval.ts`): Tool returns hundreds of records, query needs specific subset. Baseline returns ALL data to LLM (huge token cost). CLI tools saves to file + jq extracts only needed fields.
 
 2. **Deep data pipeline**: Fetch data, filter by multiple criteria, transform, aggregate. Baseline gets all raw data back to the LLM (huge token cost), CLI tools can do `tool | jq 'complex_query'` and only return the final result.
 
 3. **Multi-join**: Get entity A, use its foreign key to get B, use B's foreign key to get C. Baseline needs 3 sequential round-trips. CLI tools can chain in 1 call.
 
-4. **Many tools, few used**: 20+ tools available but only 3-4 needed. Baseline's prompt includes all 20 tool schemas (massive token overhead per round-trip). CLI tools listing is a fraction of that size.
+4. **Many tools, few used** (see `many-tools.eval.ts`): 15+ tools available but only 3-4 needed. Baseline's prompt includes all tool schemas (massive token overhead per round-trip). CLI tools listing is a fraction of that size.
 
 Follow the pattern in existing eval files:
 - Define mock data and schemas

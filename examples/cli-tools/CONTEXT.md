@@ -262,3 +262,85 @@ CLI tools has ~250 token overhead per LLM call due to:
 - `examples/cli-tools/evals/piping.eval.ts` - Changed to Sonnet
 - `examples/cli-tools/evals/basic.eval.ts` - Changed to Sonnet
 - `examples/cli-tools/evals/batch.eval.ts` - NEW FILE
+
+---
+
+## Session 3: Inline Output & Structure Hints (2026-02-05)
+
+### Problem
+
+CLI tools were using **2x the number of calls** compared to baseline because every tool output was saved to a file, requiring a separate `cat` call to read the result.
+
+Example flow before:
+1. `fetch-user --id usr_1` → "Output saved to .cli-output/fetch-user-123.json"
+2. `cat .cli-output/fetch-user-123.json` → actual data
+
+This doubled round-trips and token usage.
+
+### Solution 1: Inline Small Outputs
+
+Added `INLINE_OUTPUT_THRESHOLD` (2000 chars). Small outputs now return directly:
+
+```typescript
+// In command-adapter.ts
+if (jsonOutput.length <= INLINE_OUTPUT_THRESHOLD) {
+  return { stdout: jsonOutput + "\n", ... };
+}
+```
+
+**Result:** Call count dropped by 50% across all evals.
+
+### Solution 2: Structure Hints for Large Outputs
+
+When outputs ARE saved to files, include a structure hint so the model knows the JSON shape without exploring:
+
+```
+Output saved to /workspace/.cli-output/list-products-123.json
+Structure: {products: array[55], total: number}
+```
+
+This enables correct `jq` queries on the first try:
+```bash
+jq '.products | sort_by(-.rating) | first' file.json
+```
+
+**Without hint:** Model had to `cat` the entire file (26KB) to learn the structure.
+**With hint:** Model used correct jq path immediately.
+
+### New Eval: Large Data
+
+Created `large-data.eval.ts` to test scenarios where CLI tools + jq filtering excels:
+- 500 products in catalog
+- Query: "Find highest-rated electronics under $350"
+- CLI tools: 2 calls, 1278 tokens (jq extracts just the answer)
+- Baseline: 1 call, 6036 tokens (entire filtered dataset returned to LLM)
+
+**Result:** CLI tools uses 4.7x fewer tokens.
+
+### Final Eval Results
+
+| Eval | Status | CLI Tools | Baseline | Notes |
+|------|--------|-----------|----------|-------|
+| **large-data** | ✅ | 1278 tokens | 6036 tokens | 4.7x fewer - jq filtering |
+| **many-tools** | ✅ | 2051 tokens | 2523 tokens | 19% fewer - compact listing |
+| basic | ❌ | 1289 tokens | 1223 tokens | 5% overhead |
+| composing | ❌ | 1283 tokens | 1045 tokens | 23% overhead |
+| piping | ❌ | 1640 tokens | 1331 tokens | 23% overhead |
+| batch | ❌ | 1983 tokens | 1376 tokens | 44% overhead |
+
+### Key Insight
+
+CLI tools excel in two scenarios:
+1. **Large datasets** - jq can extract only needed fields, avoiding massive token consumption
+2. **Many tools (15+)** - compact CLI listing beats many separate tool schemas
+
+For simple 2-3 tool scenarios with small data, native tools have less overhead.
+
+### Files Changed
+
+- `src/cli-tools/types.ts` - Added `INLINE_OUTPUT_THRESHOLD` constant
+- `src/cli-tools/command-adapter.ts` - Inline small outputs + structure hints for large outputs
+- `src/cli-tools/prompt-generator.ts` - Simplified prompt ("Small outputs return inline...")
+- `examples/cli-tools/evals/utils.ts` - Added `skipFewerToolCalls` option
+- `examples/cli-tools/evals/large-data.eval.ts` - NEW FILE
+- `examples/cli-tools/README.md` - Updated documentation

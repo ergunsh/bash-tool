@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import { isOptional, toKebabCase } from "./cli-parser.js";
-import { CLI_OUTPUT_DIR, type CliToolDefinition } from "./types.js";
+import type { CliToolDefinition } from "./types.js";
 
 /**
  * Get the inner type name, unwrapping optional/default wrappers.
@@ -124,9 +124,7 @@ export function generateCliToolsPrompt(
   }
 
   lines.push("");
-  lines.push(`Output files saved to: ${CLI_OUTPUT_DIR}/`);
-  lines.push("Read output: cat <path> | jq '.field'");
-  lines.push("Search: grep 'pattern' <path>");
+  lines.push("Small outputs return inline. Large outputs saved to files.");
 
   return lines.join("\n");
 }

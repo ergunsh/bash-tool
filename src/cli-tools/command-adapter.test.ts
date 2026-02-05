@@ -41,7 +41,7 @@ describe("toCommand", () => {
     expect(command.name).toBe("fetch-user");
   });
 
-  it("executes with valid args and saves output to file", async () => {
+  it("returns small output inline", async () => {
     const definition: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user",
       inputSchema: z.object({ id: z.string() }),
@@ -54,31 +54,70 @@ describe("toCommand", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stderr).toBe("");
+    // Small output returns inline as JSON
+    const output = JSON.parse(result.stdout);
+    expect(output).toEqual({ name: "User usr_123" });
+    // File should not be written for small output
+    expect(ctx.fs.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("saves large output to file with structure hint", async () => {
+    const definition: CliToolDefinition<Record<string, never>> = {
+      description: "Lists users",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        // Generate large output that exceeds inline threshold
+        users: Array.from({ length: 100 }, (_, i) => ({
+          id: `usr_${i}`,
+          name: `User ${i}`,
+          email: `user${i}@example.com`,
+          bio: `A longer bio text for user ${i} to make this output exceed the threshold.`,
+        })),
+        total: 100,
+      }),
+    };
+
+    const command = toCommand("listUsers", definition);
+    const ctx = createMockContext();
+    (ctx.fs.exists as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    const result = await command.execute([], ctx);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr).toBe("");
     expect(result.stdout).toContain("Output saved to");
-    expect(result.stdout).toContain(".cli-output/fetch-user-");
+    expect(result.stdout).toContain(".cli-output/list-users-");
     expect(result.stdout).toContain(".json");
+    // Structure hint included
+    expect(result.stdout).toContain("Structure:");
+    expect(result.stdout).toContain("users[100]");
     expect(ctx.fs.writeFile).toHaveBeenCalled();
   });
 
-  it("creates output directory if it does not exist", async () => {
-    const definition: CliToolDefinition<{ id: string }> = {
-      description: "Fetches a user",
-      inputSchema: z.object({ id: z.string() }),
-      execute: async ({ id }) => ({ name: `User ${id}` }),
+  it("creates output directory for large output if it does not exist", async () => {
+    const definition: CliToolDefinition<Record<string, never>> = {
+      description: "Lists users",
+      inputSchema: z.object({}),
+      execute: async () => ({
+        users: Array.from({ length: 100 }, (_, i) => ({
+          id: `usr_${i}`,
+          name: `User ${i}`,
+          bio: `Longer bio text for user ${i} to exceed threshold.`,
+        })),
+      }),
     };
 
-    const command = toCommand("fetchUser", definition);
+    const command = toCommand("listUsers", definition);
     const ctx = createMockContext();
     (ctx.fs.exists as ReturnType<typeof vi.fn>).mockResolvedValue(false);
 
-    await command.execute(["--id", "usr_123"], ctx);
+    await command.execute([], ctx);
 
     expect(ctx.fs.mkdir).toHaveBeenCalledWith("/workspace/.cli-output", {
       recursive: true,
     });
   });
 
-  it("does not create output directory if it already exists", async () => {
+  it("does not create output directory for small output", async () => {
     const definition: CliToolDefinition<{ id: string }> = {
       description: "Fetches a user",
       inputSchema: z.object({ id: z.string() }),
@@ -91,7 +130,9 @@ describe("toCommand", () => {
 
     await command.execute(["--id", "usr_123"], ctx);
 
+    // Small output returns inline, no directory needed
     expect(ctx.fs.mkdir).not.toHaveBeenCalled();
+    expect(ctx.fs.writeFile).not.toHaveBeenCalled();
   });
 
   it("shows help on --help flag", async () => {
@@ -224,7 +265,7 @@ describe("toCommand", () => {
     const command = toCommand("complexTool", definition);
     const ctx = createMockContext();
 
-    // With all args - verify output saved message
+    // With all args - small output returns inline
     const result1 = await command.execute(
       [
         "--id",
@@ -240,13 +281,9 @@ describe("toCommand", () => {
       ctx,
     );
     expect(result1.exitCode).toBe(0);
-    expect(result1.stdout).toContain("Output saved to");
-    expect(ctx.fs.writeFile).toHaveBeenCalled();
-
-    // Verify JSON written to file
-    const writeCall = (ctx.fs.writeFile as ReturnType<typeof vi.fn>).mock
-      .calls[0];
-    expect(JSON.parse(writeCall[1])).toEqual({
+    // Small output returns inline as JSON
+    const output = JSON.parse(result1.stdout);
+    expect(output).toEqual({
       result: "test-5-true-a,b",
     });
   });
@@ -263,7 +300,8 @@ describe("toCommand", () => {
     const result = await command.execute(["--id", "123"], ctx);
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Output saved to");
+    // Small output returns inline
+    expect(JSON.parse(result.stdout)).toEqual({ name: "User 123" });
   });
 });
 

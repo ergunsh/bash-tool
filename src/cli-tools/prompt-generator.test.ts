@@ -22,10 +22,10 @@ describe("generateCliToolsPrompt", () => {
     expect(result).toContain("CLI TOOLS (outputs saved to files):");
     // Shows usage signature with flags upfront (no --help needed)
     expect(result).toContain("fetch-user --id <string>");
-    // Shows file-based output instructions
-    expect(result).toContain("Output files saved to: .cli-output/");
-    expect(result).toContain("Read output: cat <path> | jq");
-    expect(result).toContain("Search: grep 'pattern' <path>");
+    // Shows output behavior note
+    expect(result).toContain(
+      "Small outputs return inline. Large outputs saved to files.",
+    );
     // Should NOT require --help (new strategy)
     expect(result).not.toContain("MUST run <tool> --help");
   });

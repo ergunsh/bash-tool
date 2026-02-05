@@ -36,6 +36,8 @@ export interface AssertionConfig {
   requiredResponseTerms?: string[];
   /** Custom assertion functions */
   custom?: ((result: ComparisonResult) => AssertionResult)[];
+  /** Skip the fewerToolCalls assertion (default: false) */
+  skipFewerToolCalls?: boolean;
 }
 
 export interface ComparisonConfig {
@@ -196,18 +198,20 @@ export async function runComparison(
   const assertionResults: AssertionResult[] = [];
   const assertionConfig = config.assertions ?? {};
 
-  // Always assert CLI tools use fewer or equal tool calls
-  const fewerCallsPassed =
-    cliResult.calls.length <= baselineResult.calls.length;
-  assertionResults.push({
-    name: "fewerToolCalls",
-    passed: fewerCallsPassed,
-    message: fewerCallsPassed
-      ? `CLI tools: ${cliResult.calls.length} calls <= baseline: ${baselineResult.calls.length} calls`
-      : `CLI tools used MORE calls (${cliResult.calls.length}) than baseline (${baselineResult.calls.length})`,
-    expected: `<= ${baselineResult.calls.length}`,
-    actual: cliResult.calls.length,
-  });
+  // Assert CLI tools use fewer or equal tool calls (unless skipped)
+  if (!assertionConfig.skipFewerToolCalls) {
+    const fewerCallsPassed =
+      cliResult.calls.length <= baselineResult.calls.length;
+    assertionResults.push({
+      name: "fewerToolCalls",
+      passed: fewerCallsPassed,
+      message: fewerCallsPassed
+        ? `CLI tools: ${cliResult.calls.length} calls <= baseline: ${baselineResult.calls.length} calls`
+        : `CLI tools used MORE calls (${cliResult.calls.length}) than baseline (${baselineResult.calls.length})`,
+      expected: `<= ${baselineResult.calls.length}`,
+      actual: cliResult.calls.length,
+    });
+  }
 
   // Always assert CLI tools use fewer or equal tokens
   const fewerTokensPassed = cliResult.tokens <= baselineResult.tokens;

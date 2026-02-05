@@ -27,7 +27,7 @@ async function execBash(
  */
 describe("CLI tools integration", () => {
   describe("basic CLI tool", () => {
-    it("executes CLI tool with args and saves output to file", async () => {
+    it("returns small output inline", async () => {
       const fetchUser = experimental_createCliTool({
         description: "Fetches a user from the database",
         inputSchema: z.object({
@@ -47,44 +47,81 @@ describe("CLI tools integration", () => {
 
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toBe("");
-      expect(result.stdout).toContain("Output saved to");
-      expect(result.stdout).toContain(".cli-output/fetch-user-");
-      expect(result.stdout).toContain(".json");
+      // Small output returns inline as JSON
+      const output = JSON.parse(result.stdout);
+      expect(output).toEqual({
+        name: "User usr_123",
+        email: "usr_123@example.com",
+      });
     });
 
-    it("can read output file with cat and jq", async () => {
-      const fetchUser = experimental_createCliTool({
-        description: "Fetches a user from the database",
-        inputSchema: z.object({
-          id: z.string().describe("The user ID"),
-        }),
-        execute: async ({ id }) => ({
-          name: `User ${id}`,
-          email: `${id}@example.com`,
+    it("saves large output to file with structure hint", async () => {
+      // Generate large output that exceeds inline threshold
+      const listUsers = experimental_createCliTool({
+        description: "Lists all users",
+        inputSchema: z.object({}),
+        execute: async () => ({
+          users: Array.from({ length: 100 }, (_, i) => ({
+            id: `usr_${i}`,
+            name: `User ${i}`,
+            email: `user${i}@example.com`,
+            bio: `This is a longer description for user ${i} to make the output large enough to exceed the inline threshold.`,
+          })),
+          total: 100,
         }),
       });
 
       const { tools } = await createBashTool({
-        cliTools: { fetchUser },
+        cliTools: { listUsers },
+      });
+
+      const result = await execBash(tools, "list-users");
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stderr).toBe("");
+      // Large output saved to file
+      expect(result.stdout).toContain("Output saved to");
+      expect(result.stdout).toContain(".cli-output/list-users-");
+      expect(result.stdout).toContain(".json");
+      // Structure hint included
+      expect(result.stdout).toContain("Structure:");
+      expect(result.stdout).toContain("users[100]");
+    });
+
+    it("can read large output file with cat and jq", async () => {
+      const listUsers = experimental_createCliTool({
+        description: "Lists all users",
+        inputSchema: z.object({}),
+        execute: async () => ({
+          users: Array.from({ length: 100 }, (_, i) => ({
+            id: `usr_${i}`,
+            name: `User ${i}`,
+            email: `user${i}@example.com`,
+            bio: `This is a longer description for user ${i}.`,
+          })),
+          total: 100,
+        }),
+      });
+
+      const { tools } = await createBashTool({
+        cliTools: { listUsers },
       });
 
       // Execute and capture output path
-      const result = await execBash(tools, "fetch-user --id usr_123");
+      const result = await execBash(tools, "list-users");
       expect(result.exitCode).toBe(0);
 
       // Extract the path from stdout
       const pathMatch = result.stdout.match(/Output saved to (.+\.json)/);
       expect(pathMatch).not.toBeNull();
-      const outputPath = pathMatch![1];
+      const outputPath = pathMatch?.[1];
 
       // Read the file with cat
       const catResult = await execBash(tools, `cat ${outputPath}`);
       expect(catResult.exitCode).toBe(0);
       const output = JSON.parse(catResult.stdout);
-      expect(output).toEqual({
-        name: "User usr_123",
-        email: "usr_123@example.com",
-      });
+      expect(output.users).toHaveLength(100);
+      expect(output.total).toBe(100);
     });
 
     it("shows help documentation on --help flag", async () => {
@@ -162,12 +199,8 @@ describe("CLI tools integration", () => {
       );
 
       expect(result.exitCode).toBe(0);
-
-      // Extract and read output file
-      const pathMatch = result.stdout.match(/Output saved to (.+\.json)/);
-      expect(pathMatch).not.toBeNull();
-      const catResult = await execBash(tools, `cat ${pathMatch![1]}`);
-      const output = JSON.parse(catResult.stdout);
+      // Small output returns inline
+      const output = JSON.parse(result.stdout);
       expect(output.content).toBe('{"key": "value"}');
     });
 
@@ -193,12 +226,8 @@ describe("CLI tools integration", () => {
       );
 
       expect(result.exitCode).toBe(0);
-
-      // Extract and read output file
-      const pathMatch = result.stdout.match(/Output saved to (.+\.json)/);
-      expect(pathMatch).not.toBeNull();
-      const catResult = await execBash(tools, `cat ${pathMatch![1]}`);
-      const output = JSON.parse(catResult.stdout);
+      // Small output returns inline
+      const output = JSON.parse(result.stdout);
       expect(output.value).toBe("hello");
     });
 
@@ -219,18 +248,14 @@ describe("CLI tools integration", () => {
       const result = await execBash(tools, "get-cwd");
 
       expect(result.exitCode).toBe(0);
-
-      // Extract and read output file
-      const pathMatch = result.stdout.match(/Output saved to (.+\.json)/);
-      expect(pathMatch).not.toBeNull();
-      const catResult = await execBash(tools, `cat ${pathMatch![1]}`);
-      const output = JSON.parse(catResult.stdout);
+      // Small output returns inline
+      const output = JSON.parse(result.stdout);
       expect(output.cwd).toBe("/custom/path");
     });
   });
 
-  describe("file-based output with jq", () => {
-    it("can read and process output file with jq", async () => {
+  describe("inline output with jq", () => {
+    it("can pipe inline output to jq", async () => {
       const listUsers = experimental_createCliTool({
         description: "Lists all users",
         inputSchema: z.object({}),
@@ -246,23 +271,13 @@ describe("CLI tools integration", () => {
         cliTools: { listUsers },
       });
 
-      // Execute and capture output path
-      const result = await execBash(tools, "list-users");
+      // Small output returns inline, can pipe to jq
+      const result = await execBash(tools, "list-users | jq '.users[0].name'");
       expect(result.exitCode).toBe(0);
-      const pathMatch = result.stdout.match(/Output saved to (.+\.json)/);
-      expect(pathMatch).not.toBeNull();
-
-      // Use jq to extract from file
-      const jqResult = await execBash(
-        tools,
-        `cat ${pathMatch![1]} | jq '.users[0].name'`,
-      );
-
-      expect(jqResult.exitCode).toBe(0);
-      expect(jqResult.stdout.trim()).toBe('"Alice"');
+      expect(result.stdout.trim()).toBe('"Alice"');
     });
 
-    it("can filter array with jq from file", async () => {
+    it("can filter array with jq from inline output", async () => {
       const getData = experimental_createCliTool({
         description: "Gets data",
         inputSchema: z.object({}),
@@ -279,20 +294,14 @@ describe("CLI tools integration", () => {
         cliTools: { getData },
       });
 
-      // Execute and capture output path
-      const result = await execBash(tools, "get-data");
-      expect(result.exitCode).toBe(0);
-      const pathMatch = result.stdout.match(/Output saved to (.+\.json)/);
-      expect(pathMatch).not.toBeNull();
-
-      // Use jq to filter from file
-      const jqResult = await execBash(
+      // Pipe inline output to jq
+      const result = await execBash(
         tools,
-        `cat ${pathMatch![1]} | jq '[.items[] | select(.active)]'`,
+        "get-data | jq '[.items[] | select(.active)]'",
       );
 
-      expect(jqResult.exitCode).toBe(0);
-      const output = JSON.parse(jqResult.stdout);
+      expect(result.exitCode).toBe(0);
+      const output = JSON.parse(result.stdout);
       expect(output).toEqual([
         { id: 1, active: true },
         { id: 3, active: true },
@@ -321,22 +330,18 @@ describe("CLI tools integration", () => {
         cliTools: { fetchUser, sendEmail },
       });
 
-      // Test fetchUser
+      // Test fetchUser - small output returns inline
       const result1 = await execBash(tools, "fetch-user --id usr_1");
       expect(result1.exitCode).toBe(0);
-      const path1 = result1.stdout.match(/Output saved to (.+\.json)/)![1];
-      const cat1 = await execBash(tools, `cat ${path1}`);
-      expect(JSON.parse(cat1.stdout)).toEqual({ name: "User usr_1" });
+      expect(JSON.parse(result1.stdout)).toEqual({ name: "User usr_1" });
 
-      // Test sendEmail
+      // Test sendEmail - small output returns inline
       const result2 = await execBash(
         tools,
         'send-email --to bob@example.com --subject "Hello"',
       );
       expect(result2.exitCode).toBe(0);
-      const path2 = result2.stdout.match(/Output saved to (.+\.json)/)![1];
-      const cat2 = await execBash(tools, `cat ${path2}`);
-      expect(JSON.parse(cat2.stdout)).toEqual({ sent: true });
+      expect(JSON.parse(result2.stdout)).toEqual({ sent: true });
     });
   });
 

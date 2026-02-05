@@ -5,9 +5,53 @@ import {
   CLI_OUTPUT_DIR,
   type CliToolDefinition,
   type CliToolsRecord,
+  INLINE_OUTPUT_THRESHOLD,
 } from "./types.js";
 
 export { toKebabCase };
+
+/**
+ * Generate a brief structure hint for JSON output.
+ * Shows top-level keys and array item fields to help with jq queries.
+ */
+function generateStructureHint(data: unknown, depth = 0): string {
+  if (data === null) return "null";
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) return "[]";
+    // Show first item's structure for arrays
+    const itemHint =
+      depth < 1 ? generateStructureHint(data[0], depth + 1) : "...";
+    return `[${data.length}]${itemHint}`;
+  }
+
+  if (typeof data === "object") {
+    const keys = Object.keys(data);
+    const maxKeys = depth === 0 ? 4 : 6;
+    const hints = keys.slice(0, maxKeys).map((key) => {
+      const value = (data as Record<string, unknown>)[key];
+      if (Array.isArray(value)) {
+        if (depth < 1 && value.length > 0) {
+          const itemHint = generateStructureHint(value[0], depth + 1);
+          return `${key}[${value.length}]${itemHint}`;
+        }
+        return `${key}[${value.length}]`;
+      }
+      if (typeof value === "object" && value !== null) {
+        return depth < 1
+          ? `${key}: ${generateStructureHint(value, depth + 1)}`
+          : `${key}: {...}`;
+      }
+      return key;
+    });
+    if (keys.length > maxKeys) {
+      hints.push("...");
+    }
+    return `{${hints.join(", ")}}`;
+  }
+
+  return typeof data;
+}
 
 /**
  * Convert a CliToolDefinition to a just-bash Command.
@@ -68,7 +112,16 @@ export function toCommand<TInput>(
         const result = await execute(parseResult.data as TInput, ctx);
         const jsonOutput = JSON.stringify(result, null, 2);
 
-        // Save output to file
+        // Return small outputs inline, save large outputs to file
+        if (jsonOutput.length <= INLINE_OUTPUT_THRESHOLD) {
+          return {
+            stdout: `${jsonOutput}\n`,
+            stderr: "",
+            exitCode: 0,
+          };
+        }
+
+        // Save large output to file
         const outputDir = `${ctx.cwd}/${CLI_OUTPUT_DIR}`;
         if (!(await ctx.fs.exists(outputDir))) {
           await ctx.fs.mkdir(outputDir, { recursive: true });
@@ -76,8 +129,11 @@ export function toCommand<TInput>(
         const outputPath = `${outputDir}/${kebabName}-${Date.now()}.json`;
         await ctx.fs.writeFile(outputPath, jsonOutput);
 
+        // Include structure hint to help with jq queries
+        const structureHint = generateStructureHint(result);
+
         return {
-          stdout: `Output saved to ${outputPath}\n`,
+          stdout: `Output saved to ${outputPath}\nStructure: ${structureHint}\n`,
           stderr: "",
           exitCode: 0,
         };

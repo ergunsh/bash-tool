@@ -7,6 +7,13 @@ import type { z } from "zod";
 export const CLI_OUTPUT_DIR = ".cli-output";
 
 /**
+ * Maximum output size (in characters) to return inline.
+ * Outputs larger than this are saved to files.
+ * Default: 2000 characters (~50 lines of JSON)
+ */
+export const INLINE_OUTPUT_THRESHOLD = 2000;
+
+/**
  * Context provided to CLI tool execute functions.
  * Alias for just-bash's CommandContext - provides fs, cwd, env, stdin, exec.
  */
