@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import type { ToolExecutionOptions } from "ai";
 import { afterEach, assert, beforeEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { createBashTool } from "./tool.js";
 import type { CommandResult } from "./types.js";
 
@@ -235,6 +236,64 @@ describe("createBashTool integration", () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout.trim()).toBe("Hello, World!");
     });
+  });
+
+  describe("codemode", () => {
+    it("runs codemode end to end", async () => {
+      const { tools } = await createBashTool({
+        files: {
+          "runner.ts": `
+              import { searchDocs } from "./.codemode/index.ts";
+
+              const result = await searchDocs({
+                query: "cache",
+                limit: 3,
+              });
+
+              console.log(JSON.stringify(result));
+            `,
+        },
+        codemode: {
+          runtimeTools: {
+            searchDocs: {
+              description: "Search docs",
+              inputSchema: z.object({
+                query: z.string(),
+                limit: z.number().int().min(1).max(20).default(5),
+              }),
+              outputSchema: z.array(
+                z.object({
+                  title: z.string(),
+                  url: z.string(),
+                }),
+              ),
+              execute: async ({ query, limit }) => {
+                return [
+                  {
+                    title: `${query}:${limit}`,
+                    url: "https://example.com/docs",
+                  },
+                ];
+              },
+            },
+          },
+        },
+      });
+
+      assert(tools.bash.execute, "bash.execute should be defined");
+
+      const result = (await tools.bash.execute(
+        {
+          command: "js-exec runner.ts",
+        },
+        opts,
+      )) as CommandResult;
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe(
+        '[{"title":"cache:3","url":"https://example.com/docs"}]',
+      );
+    }, 15000);
   });
 });
 

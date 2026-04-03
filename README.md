@@ -175,6 +175,54 @@ const customSandbox: Sandbox = {
 const { tools } = await createBashTool({ sandbox: customSandbox });
 ```
 
+### Codemode (Experimental)
+
+Codemode generates typed runtime helpers inside the sandbox so `js-exec` code can import them from `./.codemode/index.ts`.
+
+V1 currently supports the default internally-created `just-bash` sandbox path.
+
+```typescript
+import {
+  createBashTool,
+  experimental_defineCodemodeTool,
+} from "bash-tool";
+import { z } from "zod";
+
+const searchDocs = experimental_defineCodemodeTool({
+  description: "Search the product docs.",
+  inputSchema: z.object({
+    query: z.string(),
+    limit: z.number().int().min(1).max(20).default(5),
+  }),
+  outputSchema: z.array(
+    z.object({
+      title: z.string(),
+      url: z.string(),
+    }),
+  ),
+  execute: async ({ query, limit }) => {
+    return [
+      {
+        title: `${query}:${limit}`,
+        url: "https://example.com/docs",
+      },
+    ];
+  },
+});
+
+const { tools } = await createBashTool({
+  codemode: {
+    runtimeTools: {
+      searchDocs,
+    },
+  },
+});
+```
+
+See [examples/codemode/](./examples/codemode/) for runnable codemode examples.
+
+Inside sandboxed JavaScript or TypeScript, import helpers from `./.codemode/index.ts` and run them with `js-exec`.
+
 ## Skills (Experimental)
 
 [Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview) are modular capabilities that extend agent functionality. Each skill is a directory containing a `SKILL.md` file with instructions and optional scripts.

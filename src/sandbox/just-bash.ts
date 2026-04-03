@@ -1,4 +1,5 @@
 import type { CommandResult, Sandbox } from "../types.js";
+import { createJavascriptCommands } from "./js-exec.js";
 
 /**
  * Minimal interface for the just-bash methods we actually use.
@@ -30,6 +31,10 @@ export interface JustBashSandboxOptions {
    * When provided, `files` is ignored.
    */
   overlayRoot?: string;
+  /** Enable just-bash js-exec support */
+  javascript?: boolean | { bootstrap?: string };
+  /** Custom just-bash commands to register */
+  customCommands?: import("just-bash").CustomCommand[];
 }
 
 /**
@@ -58,6 +63,12 @@ export async function createJustBashSandbox(
 
   let bashEnv: InstanceType<typeof Bash>;
   let mountPoint: string | undefined;
+  const customCommands = [
+    ...(options.javascript
+      ? await createJavascriptCommands(options.javascript)
+      : []),
+    ...(options.customCommands ?? []),
+  ];
 
   if (options.overlayRoot && OverlayFs) {
     // Use OverlayFs for copy-on-write over a real directory
@@ -66,12 +77,14 @@ export async function createJustBashSandbox(
     bashEnv = new Bash({
       fs: overlay,
       cwd: options.cwd ?? mountPoint,
+      customCommands,
     });
   } else {
     // Use in-memory filesystem with provided files
     bashEnv = new Bash({
       files: options.files,
       cwd: options.cwd,
+      customCommands,
     });
   }
 

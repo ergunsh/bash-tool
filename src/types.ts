@@ -1,4 +1,5 @@
 import type { Sandbox as VercelSandbox } from "@vercel/sandbox";
+import type { CodemodeOptions } from "./codemode/types.js";
 import type { JustBashLike } from "./sandbox/just-bash.js";
 
 export interface CommandResult {
@@ -70,6 +71,12 @@ export interface CreateBashToolOptions {
    * @default "./workspace"
    */
   destination?: string;
+
+  /**
+   * Typed runtime helpers that are available from inside sandboxed js-exec code.
+   * Helpers are generated into `./.codemode/index.ts`.
+   */
+  codemode?: CodemodeOptions;
 
   /**
    * Inline files to write to the sandbox.

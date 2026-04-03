@@ -53,6 +53,7 @@ function createTempProject(codeBlocks: string[]): string {
         ai: [join(tempDir, "ai.d.ts")],
         "@vercel/sandbox": [join(tempDir, "vercel-sandbox.d.ts")],
         "just-bash": [join(tempDir, "just-bash.d.ts")],
+        zod: [join(REPO_ROOT, "node_modules/zod/index.d.ts")],
       },
     },
     include: [`${tempDir}/block-*.ts`],
@@ -127,7 +128,11 @@ export class Bash {
     // Build assumed imports based on what the code block uses
     const assumedImports: string[] = [];
 
-    if (code.includes("createBashTool") || code.includes("createSkillTool")) {
+    if (
+      code.includes("createBashTool") ||
+      code.includes("createSkillTool") ||
+      code.includes("experimental_defineCodemodeTool")
+    ) {
       // Build bash-tool import based on what's used
       const imports: string[] = [];
       if (code.includes("createBashTool")) {
@@ -136,10 +141,16 @@ export class Bash {
       if (code.includes("createSkillTool")) {
         imports.push("experimental_createSkillTool as createSkillTool");
       }
+      if (code.includes("experimental_defineCodemodeTool")) {
+        imports.push("experimental_defineCodemodeTool");
+      }
       if (code.includes('from "bash-tool"') && code.includes("Sandbox")) {
         imports.push("Sandbox");
       }
       assumedImports.push(`import { ${imports.join(", ")} } from "bash-tool";`);
+    }
+    if (code.includes("z.object") || code.includes('from "zod"')) {
+      assumedImports.push('import { z } from "zod";');
     }
     if (code.includes("ToolLoopAgent") || code.includes("stepCountIs")) {
       assumedImports.push('import { ToolLoopAgent, stepCountIs } from "ai";');

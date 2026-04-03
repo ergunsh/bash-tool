@@ -1,5 +1,6 @@
 import type { ToolExecutionOptions } from "ai";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import type { CommandResult } from "./types.js";
 
 // AI SDK tool execute requires (args, options) - we provide test options
@@ -17,6 +18,7 @@ vi.mock("ai", () => ({
 // Mock just-bash with a simple in-memory implementation
 const mockFiles: Record<string, string> = {};
 let mockCwd = "/workspace";
+let javascriptEnabled = false;
 
 vi.mock("just-bash", () => ({
   Bash: class MockBash {
@@ -25,9 +27,17 @@ vi.mock("just-bash", () => ({
       writeFile: (path: string, content: string) => Promise<void>;
     };
 
-    constructor(options: { files?: Record<string, string>; cwd?: string }) {
+    constructor(options: {
+      files?: Record<string, string>;
+      cwd?: string;
+      javascript?: boolean;
+      customCommands?: Array<{ name: string }>;
+    }) {
       Object.assign(mockFiles, options.files || {});
       mockCwd = options.cwd || "/workspace";
+      javascriptEnabled = (options.customCommands ?? []).some(
+        (command) => command.name === "js-exec",
+      );
 
       this.fs = {
         readFile: async (path: string) => {
@@ -43,6 +53,14 @@ vi.mock("just-bash", () => ({
     }
 
     async exec(command: string) {
+      if (command.includes("js-exec")) {
+        return {
+          stdout: "",
+          stderr: javascriptEnabled ? "" : "js-exec unavailable",
+          exitCode: javascriptEnabled ? 0 : 1,
+        };
+      }
+
       if (command === "ls") {
         const files = Object.keys(mockFiles).join("\n");
         return { stdout: files, stderr: "", exitCode: 0 };
@@ -74,6 +92,10 @@ vi.mock("just-bash", () => ({
       return `/home/user/project`;
     }
   },
+  defineCommand: (name: string, execute: unknown) => ({
+    name,
+    execute,
+  }),
 }));
 
 import { createBashTool } from "./tool.js";
@@ -84,6 +106,7 @@ describe("createBashTool", () => {
     for (const key of Object.keys(mockFiles)) {
       delete mockFiles[key];
     }
+    javascriptEnabled = false;
   });
 
   it("creates toolkit with default just-bash sandbox", async () => {
@@ -619,6 +642,95 @@ Common operations:
   cat <file>          # View file contents
 
 Always run tests first.`);
+  });
+});
+
+describe("createBashTool codemode", () => {
+  beforeEach(() => {
+    for (const key of Object.keys(mockFiles)) {
+      delete mockFiles[key];
+    }
+    javascriptEnabled = false;
+  });
+
+  it("writes generated codemode files", async () => {
+    await createBashTool({
+      codemode: {
+        runtimeTools: {
+          searchDocs: {
+            description: "Search docs",
+            inputSchema: z.object({
+              query: z.string(),
+            }),
+            outputSchema: z.array(z.string()),
+            execute: async () => ["one"],
+          },
+        },
+      },
+    });
+
+    expect(mockFiles["/workspace/.codemode/index.ts"]).toContain(
+      "export async function searchDocs",
+    );
+    expect(mockFiles["/workspace/.codemode/README.md"]).toContain(
+      "./.codemode/index.ts",
+    );
+    expect(mockFiles["/workspace/.codemode/manifest.json"]).toContain(
+      '"formatVersion": 1',
+    );
+  });
+
+  it("adds codemode instructions to the bash tool description", async () => {
+    const { tools } = await createBashTool({
+      codemode: {
+        runtimeTools: {
+          searchDocs: {
+            description: "Search docs",
+            inputSchema: z.object({
+              query: z.string(),
+            }),
+            outputSchema: z.array(z.string()),
+            execute: async () => ["one"],
+          },
+        },
+      },
+    });
+
+    expect(tools.bash.description).toContain("CODEMODE:");
+    expect(tools.bash.description).toContain("./.codemode/index.ts");
+    expect(tools.bash.description).toContain(
+      "searchDocs(input) -> Promise<SearchDocsOutput>",
+    );
+  });
+
+  it("rejects caller-supplied sandboxes in v1", async () => {
+    const sandbox = {
+      executeCommand: vi
+        .fn()
+        .mockResolvedValue({ stdout: "", stderr: "", exitCode: 0 }),
+      readFile: vi.fn().mockResolvedValue(""),
+      writeFiles: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await expect(
+      createBashTool({
+        sandbox,
+        codemode: {
+          runtimeTools: {
+            searchDocs: {
+              description: "Search docs",
+              inputSchema: z.object({
+                query: z.string(),
+              }),
+              outputSchema: z.array(z.string()),
+              execute: async () => ["one"],
+            },
+          },
+        },
+      }),
+    ).rejects.toThrow(
+      "codemode is only supported on the default just-bash sandbox in v1",
+    );
   });
 });
 

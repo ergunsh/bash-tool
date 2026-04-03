@@ -1,3 +1,10 @@
+export { experimental_defineCodemodeTool } from "./codemode/define-tool.js";
+export type {
+  AnyCodemodeTool,
+  CodemodeOptions,
+  CodemodeTool,
+  DefineCodemodeToolOptions,
+} from "./codemode/types.js";
 export type { JustBashLike } from "./sandbox/just-bash.js";
 export { experimental_createSkillTool } from "./skill-tool.js";
 export type {

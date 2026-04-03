@@ -24,6 +24,8 @@ export interface CreateBashToolOptions {
   extraInstructions?: string;
   /** Auto-generated prompt describing available bash tools */
   toolPrompt?: string;
+  /** Auto-generated codemode prompt */
+  codemodePrompt?: string;
   /** Callback before command execution, can modify the command */
   onBeforeBashCall?: (
     input: BeforeBashCallInput,
@@ -56,7 +58,7 @@ function truncateOutput(
 }
 
 function generateDescription(options: CreateBashToolOptions): string {
-  const { cwd, files, extraInstructions, toolPrompt } = options;
+  const { cwd, files, extraInstructions, toolPrompt, codemodePrompt } = options;
 
   const lines: string[] = [
     "Execute bash commands in the sandbox environment.",
@@ -83,6 +85,11 @@ function generateDescription(options: CreateBashToolOptions): string {
   // Add available tools prompt if provided
   if (toolPrompt) {
     lines.push(toolPrompt);
+    lines.push("");
+  }
+
+  if (codemodePrompt) {
+    lines.push(codemodePrompt);
     lines.push("");
   }
 
